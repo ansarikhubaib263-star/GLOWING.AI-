@@ -3,123 +3,92 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#080a10">
   <title>GLOWING.AI — Caption Studio</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Anton&family=Bebas+Neue&family=DM+Sans:wght@400;500;700;900&family=Inter:wght@400;600;800;900&family=Montserrat:wght@400;600;800;900&family=Oswald:wght@400;600;700&family=Pacifico&family=Playfair+Display:ital,wght@0,700;1,700&family=Poppins:wght@400;600;800;900&family=Roboto+Condensed:wght@400;700&family=Space+Grotesk:wght@400;600;700&family=Titan+One&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css">
-<script type="module" src="app.js"></script>
+  <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <header class="topbar">
-    <div class="brand"><span class="brand-mark">✦</span> GLOWING<span>.AI</span></div>
-    <div class="top-actions">
-      <button id="undoBtn" class="icon-btn" title="Undo">↶</button>
-      <button id="redoBtn" class="icon-btn" title="Redo">↷</button>
-      <button id="exportBtn" class="export-btn">Export SRT</button>
-    </div>
-  </header>
-
-  <main class="studio">
-    <section class="preview-panel">
-      <div class="preview-toolbar">
-        <div><span class="live-dot"></span> PREVIEW</div>
-        <div class="ratio-pills"><button class="ratio active" data-ratio="9/16">9:16</button><button class="ratio" data-ratio="1/1">1:1</button><button class="ratio" data-ratio="16/9">16:9</button></div>
+  <div class="app">
+    <header class="topbar">
+      <div class="brand"><span class="brand-star">✦</span> GLOWING<span>.AI</span></div>
+      <div class="top-actions">
+        <button id="undoBtn" class="icon-btn" title="Undo">↶</button>
+        <button id="redoBtn" class="icon-btn" title="Redo">↷</button>
+        <button id="exportSrtBtn" class="export-btn">Export SRT</button>
       </div>
-      <div id="stage" class="stage ratio-916">
-        <video id="video" playsinline controls></video>
-        <div id="captionOverlay" class="caption-overlay">
-          <span id="captionText">Your captions will appear here</span>
+    </header>
+
+    <main class="workspace">
+      <section class="preview-panel">
+        <div class="preview-toolbar">
+          <span class="live-dot"></span><span>PREVIEW</span>
+          <div class="ratio">
+            <button data-ratio="9:16" class="active">9:16</button>
+            <button data-ratio="1:1">1:1</button>
+            <button data-ratio="16:9">16:9</button>
+          </div>
         </div>
-        <div id="emptyState" class="empty-state">
-          <div class="empty-icon">▧</div>
-          <strong>Drop a video here</strong>
-          <span>or choose a file below</span>
+
+        <div id="stage" class="stage ratio-916">
+          <video id="video" playsinline preload="metadata"></video>
+          <div id="captionOverlay" class="caption-overlay" aria-live="polite"></div>
+          <div id="emptyPreview" class="empty-preview">
+            <div class="empty-icon">▶</div>
+            <strong>Choose a video or audio</strong>
+            <span>Upload MP4/WebM/MOV to start</span>
+          </div>
         </div>
-      </div>
-      <div class="timeline">
-        <div class="time-row"><span id="currentTime">0:00</span><span id="duration">0:00</span></div>
-        <input id="scrubber" type="range" min="0" max="0" value="0" step="0.01">
-      </div>
-    </section>
 
-    <section class="controls">
-      <div class="upload-row">
-        <label class="choose-btn">＋ Choose video or audio
-          <input id="mediaInput" type="file" accept="video/*,audio/*" hidden>
-        </label>
-        <span id="fileName" class="file-name">No file selected</span>
-      </div>
-
-      <div class="caption-tools">
-        <label class="lang-control">Language
-          <select id="languageSelect">
-            <option value="hi">Hindi</option>
-            <option value="en">English</option>
-            <option value="ur">Urdu</option>
-            <option value="bn">Bengali</option>
-            <option value="ta">Tamil</option>
-            <option value="te">Telugu</option>
-            <option value="mr">Marathi</option>
-            <option value="gu">Gujarati</option>
-            <option value="pa">Punjabi</option>
-          </select>
-        </label>
-        <button id="generateBtn" class="primary">Generate captions</button>
-        <button id="addCaptionBtn">＋ Add caption</button>
-        <button id="clearBtn">Clear</button>
-      </div>
-
-      <div class="tabs">
-        <button class="tab active" data-tab="styles">Styles</button>
-        <button class="tab" data-tab="fonts">Fonts</button>
-        <button class="tab" data-tab="animation">Animation</button>
-        <button class="tab" data-tab="captions">Captions</button>
-      </div>
-
-      <div id="styles" class="tab-panel active">
-        <div class="section-head"><h2>Premium presets</h2><span>Tap to apply</span></div>
-        <div id="presetGrid" class="preset-grid"></div>
-        <div class="color-grid">
-          <label>Text <input id="textColor" type="color" value="#ffffff"></label>
-          <label>Accent <input id="accentColor" type="color" value="#00eaff"></label>
-          <label>Glow <input id="glowColor" type="color" value="#00eaff"></label>
-          <label>BG <input id="bgColor" type="color" value="#000000"></label>
+        <div class="scrubber-row">
+          <span id="currentTime">0:00</span>
+          <input id="scrubber" type="range" min="0" max="0" step="0.01" value="0">
+          <span id="duration">0:00</span>
         </div>
-        <div class="sliders">
-          <label>Glow <input id="glowRange" type="range" min="0" max="60" value="22"></label>
-          <label>Outline <input id="outlineRange" type="range" min="0" max="12" value="2"></label>
-          <label>Size <input id="sizeRange" type="range" min="18" max="90" value="46"></label>
-          <label>Letter spacing <input id="spacingRange" type="range" min="-3" max="8" value="0"></label>
+        <div class="player-row">
+          <button id="playBtn" class="play-btn">▶</button>
+          <input id="volume" type="range" min="0" max="1" step=".01" value=".9">
         </div>
-      </div>
+      </section>
 
-      <div id="fonts" class="tab-panel">
-        <div class="section-head"><h2>Fonts</h2><span>Premium typography</span></div>
-        <div id="fontGrid" class="font-grid"></div>
-        <div class="seg-row">
-          <button data-weight="400">Regular</button><button data-weight="700">Bold</button><button data-weight="900">Black</button>
+      <aside class="editor-panel">
+        <div class="upload-row">
+          <label class="upload-btn">＋ Choose video or audio<input id="fileInput" type="file" accept="video/*,audio/*"></label>
+          <span id="fileName" class="file-name">No file selected</span>
         </div>
-        <div class="seg-row"><button id="italicBtn">Italic</button><button id="capsBtn">UPPERCASE</button><button id="lowerBtn">lowercase</button></div>
-      </div>
 
-      <div id="animation" class="tab-panel">
-        <div class="section-head"><h2>Animation</h2><span>Word-by-word motion</span></div>
-        <div id="animationGrid" class="animation-grid"></div>
-        <div class="sliders">
-          <label>Speed <input id="speedRange" type="range" min="0.2" max="2.5" step="0.1" value="1"></label>
-          <label>Stagger <input id="staggerRange" type="range" min="0" max="0.25" step="0.01" value="0.06"></label>
+        <div class="primary-actions">
+          <button id="generateBtn" class="primary">Generate from transcript</button>
+          <button id="addCaptionBtn">＋ Add caption</button>
+          <button id="clearBtn">Clear</button>
         </div>
-      </div>
 
-      <div id="captions" class="tab-panel">
-        <div class="section-head"><h2>Caption track</h2><span id="captionCount">0 segments</span></div>
-        <div id="captionList" class="caption-list"></div>
-      </div>
-    </section>
-  </main>
+        <div class="transcript-box">
+          <label for="transcript">Transcript for caption generation</label>
+          <textarea id="transcript" rows="3" placeholder="Paste the spoken text here. The app will split it into timed caption segments."></textarea>
+          <div class="hint">This version never invents speech. Browser-only automatic transcription from an uploaded video's audio needs a speech-to-text engine/API.</div>
+          <div class="secondary-actions">
+            <button id="importSrtBtn">Import SRT</button>
+            <input id="srtInput" type="file" accept=".srt,text/plain" hidden>
+            <button id="micBtn">🎙 Live speech</button>
+          </div>
+        </div>
+
+        <nav class="tabs">
+          <button class="tab active" data-tab="styles">Styles</button>
+          <button class="tab" data-tab="fonts">Fonts</button>
+          <button class="tab" data-tab="animation">Animation</button>
+          <button class="tab" data-tab="captions">Captions</button>
+        </nav>
+
+        <section id="stylesTab" class="tab-panel active"></section>
+        <section id="fontsTab" class="tab-panel"></section>
+        <section id="animationTab" class="tab-panel"></section>
+        <section id="captionsTab" class="tab-panel"></section>
+      </aside>
+    </main>
+  </div>
 
   <div id="toast" class="toast"></div>
-  
+  <script src="app.js"></script>
 </body>
 </html>
