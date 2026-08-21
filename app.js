@@ -1,74 +1,109 @@
-import { pipeline, env } from 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.8.0';
+import { pipeline, env } from "https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.7.2";
+
+env.allowLocalModels = false;
+env.useBrowserCache = true;
 
 const $ = id => document.getElementById(id);
-const file=$('file'), video=$('video'), drop=$('dropZone'), status=$('status');
-const text=$('text'), caption=$('captionText'), bar=$('bar'), modelInfo=$('modelInfo');
-let mediaFile=null, transcription=[], transcriber=null, wordsTimer=null;
+const input = $("videoInput"), drop = $("dropZone"), info = $("fileInfo");
+const btn = $("transcribeBtn"), status = $("status"), statusText = $("statusText");
+const detail = $("detail"), progress = $("progress"), percent = $("percent");
+const preview = $("previewCard"), video = $("video"), overlay = $("captionOverlay");
+const list = $("captionList"), lang = $("language"), size = $("fontSize"), pos = $("position");
+const srtBtn = $("downloadSrt"), vttBtn = $("downloadVtt"), clearBtn = $("clearBtn");
 
-function fmt(s){s=Math.max(0,Math.floor(s));return String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0')}
-function apply(){
- caption.textContent=text.value||'CAPTION';
- caption.style.color=$('textColor').value;
- caption.parentElement.style.fontSize=$('fontSize').value+'px';
- caption.style.textShadow=`0 0 8px ${$('glowColor').value},0 0 ${$('glowStrength').value}px ${$('glowColor').value},0 0 ${+$('glowStrength').value+16}px ${$('glowColor').value}`;
- const p=$('position').value, box=caption.parentElement;
- box.style.top=p==='top'?'8%':p==='center'?'50%':'auto';
- box.style.bottom=p==='bottom'?'8%':'auto';
- box.style.transform=p==='center'?'translateY(-50%)':'';
+let file = null, objectUrl = null, captions = [], recognizer = null, busy = false;
+
+function setStatus(text, p=0, d=""){
+  status.classList.remove("hidden"); statusText.textContent=text;
+  progress.value=p; percent.textContent=Math.round(p)+"%"; detail.textContent=d;
 }
-['text','textColor','glowColor','fontSize','glowStrength','position'].forEach(id=>$(id).addEventListener('input',apply));
-$('fontSize').addEventListener('input',()=>$('fsVal').textContent=$('fontSize').value+'px');
-$('glowStrength').addEventListener('input',()=>$('gsVal').textContent=$('glowStrength').value);
-$('apply').onclick=apply;
+function escapeHtml(s){return s.replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
+function fmt(t){t=Math.max(0,t);const h=Math.floor(t/3600),m=Math.floor((t%3600)/60),s=Math.floor(t%60),ms=Math.floor((t%1)*1000);return `${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")},${String(ms).padStart(3,"0")}`;}
+function fmtVtt(t){return fmt(t).replace(",",".");}
+function setFile(f){
+  if(!f)return;
+  if(!f.type.startsWith("video/")&&!f.type.startsWith("audio/")){alert("Please choose a video or audio file.");return;}
+  file=f; captions=[]; list.innerHTML=""; srtBtn.disabled=vttBtn.disabled=true;
+  if(objectUrl)URL.revokeObjectURL(objectUrl);
+  objectUrl=URL.createObjectURL(f); video.src=objectUrl; preview.classList.remove("hidden");
+  info.textContent=`${f.name} • ${(f.size/1024/1024).toFixed(1)} MB`;info.classList.remove("hidden");
+  btn.disabled=false; overlay.textContent="";
+}
+input.addEventListener("change",e=>setFile(e.target.files[0]));
+["dragenter","dragover"].forEach(x=>drop.addEventListener(x,e=>{e.preventDefault();drop.classList.add("drag")}));
+["dragleave","drop"].forEach(x=>drop.addEventListener(x,e=>{e.preventDefault();drop.classList.remove("drag")}));
+drop.addEventListener("drop",e=>setFile(e.dataTransfer.files[0]));
 
-file.onchange=e=>{
- mediaFile=e.target.files[0]; if(!mediaFile)return;
- video.src=URL.createObjectURL(mediaFile); video.style.display='block'; drop.style.display='none';
- status.textContent='● Video loaded'; status.style.color='#83f7c5';
-};
+async function decodeTo16k(f){
+  const ac=new AudioContext();
+  const buf=await ac.decodeAudioData(await f.arrayBuffer());
+  const target=16000, frames=Math.ceil(buf.duration*target);
+  const off=new OfflineAudioContext(1,frames,target);
+  const src=off.createBufferSource(); src.buffer=buf;
+  src.connect(off.destination); src.start();
+  const rendered=await off.startRendering(); await ac.close();
+  return rendered.getChannelData(0);
+}
+async function getRecognizer(){
+  if(recognizer)return recognizer;
+  setStatus("Loading speech model…",5,"The first run downloads the model and may take a while.");
+  recognizer=await pipeline("automatic-speech-recognition","Xenova/whisper-tiny",{
+    device:"wasm", dtype:"q8",
+    progress_callback:p=>{
+      if(typeof p.progress==="number")setStatus("Loading speech model…",Math.min(25,5+p.progress*.2),p.status||"Downloading model…");
+    }
+  });
+  return recognizer;
+}
+function renderList(){
+  list.innerHTML="";
+  captions.forEach((c,i)=>{
+    const row=document.createElement("div");row.className="caption-row";
+    row.innerHTML=`<time>${fmt(c.start).slice(3,8)}</time><button type="button">${escapeHtml(c.text)}</button>`;
+    row.querySelector("button").onclick=()=>{video.currentTime=c.start;video.play();};
+    list.appendChild(row);
+  });
+}
+function currentCaption(t){
+  return captions.find(c=>t>=c.start && t<(c.end||c.start+4));
+}
+video.addEventListener("timeupdate",()=>{
+  const c=currentCaption(video.currentTime); overlay.textContent=c?.text||"";
+});
+size.addEventListener("input",()=>overlay.style.fontSize=size.value+"px");
+pos.addEventListener("change",()=>{overlay.className="caption-overlay "+pos.value;});
+overlay.className="caption-overlay bottom";
 
-$('play').onclick=()=>video.paused?video.play():video.pause();
-video.ontimeupdate=()=>{
- const d=video.duration||0;$('seek').value=d?video.currentTime/d*100:0;
- $('time').textContent=fmt(video.currentTime)+' / '+fmt(d);
- if(transcription.length && $('animate').checked){
-   const item=transcription.find(x=>video.currentTime>=x.start&&video.currentTime<x.end);
-   if(item && caption.textContent!==item.text){caption.textContent=item.text;caption.classList.remove('pop');void caption.offsetWidth;caption.classList.add('pop')}
- }
-};
-$('seek').oninput=e=>{if(video.duration)video.currentTime=video.duration*e.target.value/100};
+btn.addEventListener("click",async()=>{
+  if(!file||busy)return; busy=true;btn.disabled=true;
+  try{
+    if(file.size>500*1024*1024)throw new Error("This file is over 500 MB. Please use a shorter/smaller file on mobile.");
+    setStatus("Reading audio…",28,"Decoding the media locally.");
+    const audio=await decodeTo16k(file);
+    const asr=await getRecognizer();
+    setStatus("Transcribing…",35,"Speech recognition is running in your browser.");
+    const language=lang.value==="auto"?undefined:lang.value;
+    const out=await asr(audio,{
+      chunk_length_s:30,stride_length_s:5,
+      return_timestamps:true,
+      ...(language?{language}:{})
+    });
+    const chunks=out.chunks||[];
+    captions=chunks.map(c=>({start:c.timestamp?.[0]??0,end:c.timestamp?.[1]??((c.timestamp?.[0]??0)+3),text:(c.text||"").trim()}))
+      .filter(c=>c.text.length>0 && c.end>c.start);
+    if(!captions.length)throw new Error("No speech was detected. Try clearer audio or a different language setting.");
+    renderList();srtBtn.disabled=vttBtn.disabled=false;
+    setStatus("Captions ready ✓",100,`${captions.length} caption segments generated.`);
+  }catch(e){
+    console.error(e);setStatus("Could not generate captions",0,e?.message||String(e));
+    alert(e?.message||"Something went wrong while generating captions.");
+  }finally{busy=false;btn.disabled=false;}
+});
 
-$('generate').onclick=async()=>{
- if(!mediaFile){alert('Pehle video upload karo.');return}
- try{
-   status.textContent='● Loading AI model...';status.style.color='#ffd166';bar.style.width='5%';
-   modelInfo.textContent='Loading Whisper model in your browser cache...';
-   // Browser-side Whisper. Small model is chosen to keep first download practical.
-   transcriber ??= await pipeline('automatic-speech-recognition','onnx-community/whisper-tiny.en',{
-     dtype:'q8',
-     progress_callback:x=>{
-       if(x.status==='progress'&&x.progress){bar.style.width=Math.min(70,Math.round(x.progress*0.7))+'%';modelInfo.textContent='Downloading model: '+Math.round(x.progress)+'%'}
-     }
-   });
-   bar.style.width='75%';status.textContent='● Transcribing locally...';modelInfo.textContent='Extracting speech from your selected media...';
-   const result=await transcriber(URL.createObjectURL(mediaFile),{return_timestamps:true,chunk_length_s:30,stride_length_s:5});
-   const chunks=result.chunks||[];
-   transcription=chunks.map(c=>({text:c.text.trim(),start:c.timestamp?.[0]||0,end:c.timestamp?.[1]||((c.timestamp?.[0]||0)+2)})).filter(x=>x.text);
-   if(!transcription.length && result.text) transcription=[{text:result.text,start:0,end:video.duration||10}];
-   text.value=transcription.map(x=>x.text).join(' ');
-   apply();bar.style.width='100%';status.textContent='● Captions ready';status.style.color='#83f7c5';
-   modelInfo.textContent=`Generated ${transcription.length} timed caption segments locally.`;
- }catch(err){
-   console.error(err);bar.style.width='0%';status.textContent='● Transcription failed';status.style.color='#ff6b6b';
-   modelInfo.textContent='Browser-side AI could not process this file. Try a short MP4/audio clip, Chrome/Edge, or a computer.';
- }
-};
-
-$('downloadSrt').onclick=()=>{
- let data='';
- const items=transcription.length?transcription:[{text:text.value,start:0,end:Math.max(3,video.duration||5)}];
- const ts=s=>{const h=Math.floor(s/3600),m=Math.floor(s%3600/60),sec=Math.floor(s%60),ms=Math.floor((s%1)*1000);return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')},${String(ms).padStart(3,'0')}`};
- items.forEach((x,i)=>data+=`${i+1}\n${ts(x.start)} --> ${ts(x.end)}\n${x.text}\n\n`);
- const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([data],{type:'text/plain'}));a.download='glowing-captions.srt';a.click();
-};
-apply();
+function download(name,text,type){
+  const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([text],{type}));
+  a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+}
+srtBtn.onclick=()=>download("glowcaption.srt",captions.map((c,i)=>`${i+1}\n${fmt(c.start)} --> ${fmt(c.end)}\n${c.text}\n`).join("\n"),"text/plain");
+vttBtn.onclick=()=>download("glowcaption.vtt","WEBVTT\n\n"+captions.map(c=>`${fmtVtt(c.start)} --> ${fmtVtt(c.end)}\n${c.text}\n`).join("\n"),"text/vtt");
+clearBtn.onclick=()=>{if(objectUrl)URL.revokeObjectURL(objectUrl);file=null;captions=[];video.removeAttribute("src");video.load();info.classList.add("hidden");preview.classList.add("hidden");btn.disabled=true;srtBtn.disabled=vttBtn.disabled=true;overlay.textContent="";list.innerHTML="";};
