@@ -1,191 +1,152 @@
-import { pipeline, env } from 'https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2';
-env.allowLocalModels = false;
-env.useBrowserCache = true;
-let whisperPipe = null;
-
-async function getWhisper(){
-  if(whisperPipe) return whisperPipe;
-  toast('Loading caption AI… first time may take a little while');
-  whisperPipe = await pipeline('automatic-speech-recognition', 'Xenova/whisper-tiny');
-  return whisperPipe;
-}
-
-async function extractMono16k(file){
-  const buf = await file.arrayBuffer();
-  const AC = window.AudioContext || window.webkitAudioContext;
-  const ac = new AC();
-  const decoded = await ac.decodeAudioData(buf);
-  const frames = Math.ceil(decoded.duration * 16000);
-  const offline = new OfflineAudioContext(1, frames, 16000);
-  const src = offline.createBufferSource();
-  const mono = offline.createBuffer(1, decoded.length, decoded.sampleRate);
-  const out = mono.getChannelData(0);
-  for(let i=0;i<decoded.length;i++){
-    let v=0;
-    for(let c=0;c<decoded.numberOfChannels;c++) v += decoded.getChannelData(c)[i] || 0;
-    out[i]=v/decoded.numberOfChannels;
-  }
-  src.buffer=mono;
-  src.connect(offline.destination);
-  src.start();
-  const rendered=await offline.startRendering();
-  const data=rendered.getChannelData(0);
-  await ac.close();
-  return data;
-}
-
-function makeSegments(result){
-  const chunks=(result && result.chunks)||[];
-  if(!chunks.length && result?.text){
-    return [{start:0,end:Math.max(video.duration||3,3),text:result.text.trim()}];
-  }
-  return chunks.filter(x=>x.text?.trim()).map((x,i)=>{
-    const a=x.timestamp?.[0] ?? 0;
-    const b=x.timestamp?.[1] ?? Math.min((video.duration||a+3),a+3);
-    return {start:a,end:Math.max(b,a+0.8),text:x.text.trim()};
-  });
-}
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
-const video=$("#video"), overlay=$("#captionOverlay"), captionText=$("#captionText"), stage=$("#stage"), empty=$("#emptyState");
-let captions=[], selectedCaption=0, currentStyle="Neon Glow", currentFont="Inter", currentAnim="Pop", weight=900, italic=false, transformCase="normal", mediaURL="", history=[], future=[];
+const video=$("#video"), stage=$("#stage"), overlay=$("#captionOverlay"), empty=$("#emptyPreview");
+const state={
+  captions:[], selected:0, style:"Neon Glow", font:"Inter", animation:"Pop",
+  textColor:"#ffffff", accent:"#00e5ff", glow:"#00e5ff", stroke:"#071017",
+  strokeWidth:2, shadow:true, size:42, position:10, maxLines:3, align:"center",
+  background:false, bgColor:"#05070c", bgOpacity:.55, radius:12, letterSpacing:-.5,
+  animationDuration:.35, ratio:"9:16"
+};
+let history=[], future=[], lastCaptionId=null, raf=0;
 
 const presets=[
-["Neon Glow","#fff","#00eaff","#00eaff","rgba(0,234,255,.16)","0 0 24px var(--glow),0 3px 0 #000"],
-["Electric Purple","#fff","#b85cff","#b85cff","rgba(184,92,255,.14)","0 0 25px var(--glow),0 3px 0 #000"],
-["Fire","#fff","#ff6a00","#ff3d00","rgba(255,61,0,.14)","0 0 22px var(--glow),0 3px 0 #000"],
-["Gold","#fff","#ffd34d","#ffae00","rgba(255,174,0,.14)","0 0 22px var(--glow),0 3px 0 #000"],
-["Glass","#fff","#dcecff","#7dd3fc","rgba(125,211,252,.12)","0 4px 18px rgba(0,0,0,.5)"],
-["Karaoke","#fff","#ffef00","#ff00b8","rgba(255,0,184,.12)","0 0 18px var(--glow),0 3px 0 #000"],
-["Candy Pop","#fff","#ff72d2","#8b5cf6","rgba(255,114,210,.12)","0 0 24px var(--glow),0 3px 0 #000"],
-["Lime Punch","#fff","#b6ff00","#70ff00","rgba(112,255,0,.10)","0 0 22px var(--glow),0 3px 0 #000"],
-["Ice Blue","#fff","#eaffff","#00aaff","rgba(0,170,255,.12)","0 0 22px var(--glow),0 3px 0 #000"],
-["Black Punch","#fff","#fff","#111","rgba(0,0,0,.35)","0 3px 0 #000,0 0 12px #000"],
-["Marker","#111","#ffe600","#ffe600","rgba(255,230,0,.2)","0 2px 0 rgba(255,255,255,.35)"],
-["Retro Pink","#fff","#ff4da6","#ff147d","rgba(255,20,125,.14)","0 0 24px var(--glow),0 3px 0 #000"]
+ ["Neon Glow","#fff","#00e5ff","#00e5ff"],["Electric Blue","#fff","#38bdf8","#38bdf8"],
+ ["Purple Neon","#fff","#b66cff","#9b5cff"],["Hot Pink","#fff","#ff2bd6","#ff2bd6"],
+ ["Lime Pop","#fff","#b8ff00","#8cff00"],["Fire","#fff","#ff7a00","#ff3b00"],
+ ["Golden","#fff","#ffd400","#ff9d00"],["Clean White","#fff","#fff","#fff"],
+ ["Black Punch","#fff","#000","#000"],["Karaoke","#fff","#00e5ff","#00e5ff"],
+ ["Word Pop","#fff","#ffe100","#ffe100"],["Glass","#fff","#70e7ff","#00e5ff"],
+ ["Cinematic","#fff","#e9eef7","#7890b5"],["Retro","#ffe8b0","#ff7b00","#ff7b00"],
+ ["Editorial","#fff","#ff5c8a","#ff5c8a"],["Cyber","#d9ffff","#00ffd5","#00ffd5"],
+ ["Violet","#fff","#a78bfa","#8b5cf6"],["Mint","#06201d","#5fffe1","#34e8d0"],
+ ["Sunset","#fff","#ff8a65","#ff4d6d"],["Minimal","#fff","#fff","#aaa"],
+ ["Outline","#fff","#00e5ff","#00e5ff"],["Shadow","#fff","#fff","#111"],
+ ["Bubble","#071017","#5ee7ff","#5ee7ff"],["Toxic","#111","#a3ff12","#8cff00"],
+ ["Ocean","#fff","#00c6ff","#0072ff"],["Rose","#fff","#ff7aa2","#ff3b7d"],
+ ["Mono","#fff","#aaa","#666"],["Dream","#fff","#d8b4fe","#c084fc"],
+ ["Matrix","#c8ffcc","#16ff5c","#16ff5c"],["Premium Gold","#fff3c4","#ffc400","#ff8a00"]
 ];
 const fonts=[
-["Inter","Inter"],["Poppins","Poppins"],["Montserrat","Montserrat"],["Anton","Anton"],["Bebas Neue","Bebas Neue"],["Oswald","Oswald"],["Roboto Condensed","Roboto Condensed"],["DM Sans","DM Sans"],["Space Grotesk","Space Grotesk"],["Titan One","Titan One"],["Playfair Display","Playfair Display"],["Pacifico","Pacifico"],["Arial Black","Arial Black"],["Georgia","Georgia"],["Trebuchet","Trebuchet MS"],["Impact","Impact"]
+ ["Inter","Inter,system-ui,sans-serif"],["Arial Black","Arial Black,Arial,sans-serif"],
+ ["Impact","Impact,Haettenschweiler,sans-serif"],["Trebuchet","Trebuchet MS,sans-serif"],
+ ["Georgia","Georgia,serif"],["Times","Times New Roman,serif"],["Verdana","Verdana,sans-serif"],
+ ["Courier","Courier New,monospace"],["Garamond","Garamond,serif"],["Arial","Arial,sans-serif"],
+ ["Helvetica","Helvetica,Arial,sans-serif"],["Tahoma","Tahoma,sans-serif"],
+ ["Comic","Comic Sans MS,cursive"],["Palatino","Palatino Linotype,serif"],
+ ["Lucida","Lucida Sans,sans-serif"],["System","system-ui,sans-serif"],
+ ["Black","Arial Black,system-ui,sans-serif"],["Condensed","Arial Narrow,Arial,sans-serif"],
+ ["Serif Bold","Georgia,serif"],["Mono","ui-monospace,monospace"]
 ];
-const anims=[["None","none"],["Pop","pop"],["Zoom","zoom"],["Slide Left","slide"],["Bounce","bounce"],["Blur In","blur"],["Glow Up","glow"],["Rise Up","rise"],["Flip","flip"],["Elastic","elastic"],["Punch","punch"],["Float","float"]];
+const anims=["None","Fade","Pop","Bounce","Slide Up","Slide Left","Zoom","Glow Pulse","Typewriter","Karaoke"];
 
-function toast(t){let x=$("#toast");x.textContent=t;x.classList.add("show");setTimeout(()=>x.classList.remove("show"),1800)}
-function saveState(){history.push(JSON.stringify({captions,selectedCaption,currentStyle,currentFont,currentAnim,weight,italic,transformCase}));if(history.length>30)history.shift();future=[]}
+function uid(){return Math.random().toString(36).slice(2)+Date.now()}
+function clone(x){return JSON.parse(JSON.stringify(x))}
+function snapshot(){return clone({captions:state.captions,style:state.style,font:state.font,animation:state.animation,textColor:state.textColor,accent:state.accent,glow:state.glow,stroke:state.stroke,strokeWidth:state.strokeWidth,shadow:state.shadow,size:state.size,position:state.position,maxLines:state.maxLines,align:state.align,background:state.background,bgColor:state.bgColor,bgOpacity:state.bgOpacity,radius:state.radius,letterSpacing:state.letterSpacing,animationDuration:state.animationDuration})}
+function restore(s){Object.assign(state,s); renderAll()}
+function commit(){history.push(snapshot()); if(history.length>30)history.shift(); future=[]}
+function toast(t){const x=$("#toast");x.textContent=t;x.classList.add("show");clearTimeout(toast.t);toast.t=setTimeout(()=>x.classList.remove("show"),1800)}
+function fmt(sec){sec=Math.max(0,Number(sec)||0);const m=Math.floor(sec/60),s=Math.floor(sec%60);return `${m}:${String(s).padStart(2,"0")}`}
+function srtTime(sec){const ms=Math.round((sec%1)*1000);return `${String(Math.floor(sec/3600)).padStart(2,"0")}:${String(Math.floor(sec%3600/60)).padStart(2,"0")}:${String(Math.floor(sec%60)).padStart(2,"0")},${String(ms).padStart(3,"0")}`}
 function renderPresets(){
- $("#presetGrid").innerHTML=presets.map((p,i)=>`<button class="preset ${p[0]===currentStyle?"selected":""}" data-i="${i}" style="background:linear-gradient(145deg,${p[3]}22,${p[4]})"><div class="mini" style="color:${p[1]};font-family:Inter;text-shadow:${p[5]}">${p[0]==="Marker"?"BROWN":"the QUICK"}</div><small>${p[0]}</small></button>`).join("");
- $$("#presetGrid .preset").forEach(b=>b.onclick=()=>{saveState();applyPreset(presets[+b.dataset.i]);renderPresets()});
-}
-function applyPreset(p){
-  currentStyle=p[0];
-  $("#textColor").value=p[1];
-  $("#accentColor").value=p[2];
-  $("#glowColor").value=p[3];
-  $("#bgColor").value="#000000";
-  overlay.style.setProperty("--glow",p[3]);
-  overlay.style.setProperty("--accent",p[2]);
-  captionText.style.color=p[1];
-  captionText.style.textShadow=p[5];
-  captionText.style.background=p[0]==="Marker"?"linear-gradient(transparent 38%,#ffe600 38%,#ffe600 82%,transparent 82%)":"none";
-  captionText.style.webkitBackgroundClip="initial";
-  captionText.style.padding=p[0]==="Glass"?".12em .28em":"0";
-  captionText.style.borderRadius=p[0]==="Glass"?".18em":"0";
-  captionText.style.backdropFilter=p[0]==="Glass"?"blur(8px)":"none";
-  renderCaption();
+ $("#stylesTab").innerHTML=`<div class="panel-title">Premium presets</div><div class="grid">${presets.map((p,i)=>`<button class="preset ${state.style===p[0]?"selected":""}" data-preset="${i}"><span class="preset-sample" style="color:${p[1]};text-shadow:0 0 9px ${p[3]};">${p[0]}</span></button>`).join("")}</div>
+ <div class="panel-title">Style controls</div><div class="control-grid">
+ <div class="control"><label>Text color</label><input id="textColor" type="color" value="${state.textColor}"></div>
+ <div class="control"><label>Accent / active word</label><input id="accent" type="color" value="${state.accent}"></div>
+ <div class="control"><label>Glow color</label><input id="glow" type="color" value="${state.glow}"></div>
+ <div class="control"><label>Glow intensity</label><input id="glowRange" type="range" min="0" max="30" value="12"></div>
+ <div class="control"><label>Stroke width</label><input id="strokeWidth" type="range" min="0" max="8" value="${state.strokeWidth}"></div>
+ <div class="control"><label>Text size</label><input id="size" type="range" min="16" max="80" value="${state.size}"></div>
+ <div class="control"><label>Vertical position</label><input id="position" type="range" min="2" max="82" value="${state.position}"></div>
+ <div class="control"><label>Alignment</label><select id="align"><option>left</option><option>center</option><option>right</option></select></div>
+ <div class="control"><label>Background</label><select id="background"><option value="false">Off</option><option value="true">On</option></select></div>
+ <div class="control"><label>Letter spacing</label><input id="letterSpacing" type="range" min="-2" max="8" step=".1" value="${state.letterSpacing}"></div>
+ </div>`;
+ $("#align").value=state.align;$("#background").value=String(state.background);
+ $$("#stylesTab [id]").forEach(el=>el.addEventListener("input",()=>{commit(); const id=el.id; if(id==="textColor")state.textColor=el.value;if(id==="accent")state.accent=el.value;if(id==="glow")state.glow=el.value;if(id==="strokeWidth")state.strokeWidth=+el.value;if(id==="size")state.size=+el.value;if(id==="position")state.position=+el.value;if(id==="align")state.align=el.value;if(id==="background")state.background=el.value==="true";if(id==="letterSpacing")state.letterSpacing=+el.value;renderPreview()}));
+ $$("#stylesTab [data-preset]").forEach(b=>b.onclick=()=>{commit();const p=presets[+b.dataset.preset];state.style=p[0];state.textColor=p[1];state.accent=p[2];state.glow=p[3];if(p[0].includes("Outline"))state.strokeWidth=3;if(p[0].includes("Shadow"))state.shadow=true;if(["Glass","Bubble"].includes(p[0]))state.background=true;else state.background=false;renderAll();});
 }
 function renderFonts(){
-  $("#fontGrid").innerHTML=fonts.map(f=>`<button type="button" class="font-card ${f[0]===currentFont?"selected":""}" data-font="${f[1]}" style="font-family:'${f[1]}',sans-serif"><span style="font-family:'${f[1]}',sans-serif">${f[0]}</span></button>`).join("");
-  $$("#fontGrid .font-card").forEach(b=>b.onclick=async()=>{
-    saveState();
-    currentFont=b.dataset.font;
-    try{await document.fonts.load(`700 28px '${currentFont}'`)}catch(e){}
-    renderFonts();
-    renderCaption();
-    toast(`${currentFont} applied ✓`);
-  });
+ $("#fontsTab").innerHTML=`<div class="panel-title">Fonts</div><div class="grid">${fonts.map((f,i)=>`<button class="preset ${state.font===f[0]?"selected":""}" data-font="${i}"><span class="preset-sample" style="font-family:${f[1]};">${f[0]}</span></button>`).join("")}</div>`;
+ $$("#fontsTab [data-font]").forEach(b=>b.onclick=()=>{commit();state.font=fonts[+b.dataset.font][0];state._fontStack=fonts[+b.dataset.font][1];renderFonts();renderPreview();});
 }
-function renderAnimations(){
-  $("#animationGrid").innerHTML=anims.map(a=>`<button type="button" class="anim-card ${a[1]===currentAnim?"selected":""}" data-anim="${a[1]}"><span>${a[0]}</span></button>`).join("");
-  $$("#animationGrid .anim-card").forEach(b=>b.onclick=()=>{
-    saveState();
-    currentAnim=b.dataset.anim;
-    renderAnimations();
-    renderCaption(true);
-    toast(`${b.textContent.trim()} animation ✓`);
-  });
+function renderAnimation(){
+ $("#animationTab").innerHTML=`<div class="panel-title">Caption animation</div><div class="grid">${anims.map(a=>`<button class="preset ${state.animation===a?"selected":""}" data-anim="${a}"><span class="preset-sample">${a}</span></button>`).join("")}</div>
+ <div class="control-grid" style="margin-top:10px"><div class="control"><label>Duration</label><input id="animDuration" type="range" min=".1" max="1.2" step=".05" value="${state.animationDuration}"></div><div class="control"><label>Max lines</label><input id="maxLines" type="range" min="1" max="5" value="${state.maxLines}"></div></div>`;
+ $$("#animationTab [data-anim]").forEach(b=>b.onclick=()=>{commit();state.animation=b.dataset.anim;renderAnimation();renderPreview()});
+ $("#animDuration").oninput=e=>{commit();state.animationDuration=+e.target.value;renderPreview()};
+ $("#maxLines").oninput=e=>{commit();state.maxLines=+e.target.value;renderPreview()};
 }
-function wrapWords(text){return text.split(/\s+/).filter(Boolean).map((w,i)=>`<span class="word" style="--i:${i}">${w}</span>`).join(" ")}
-function getActive(){if(!captions.length)return null;let t=video.currentTime;return captions.find(c=>t>=c.start&&t<=c.end)||captions[selectedCaption]||captions[0]}
-function renderCaption(forceAnimation=false){
- let c=getActive();let text=c?c.text:"Your captions will appear here";if(transformCase==="upper")text=text.toUpperCase();if(transformCase==="lower")text=text.toLowerCase();
- captionText.innerHTML=wrapWords(text);
- overlay.className="caption-overlay";
- void overlay.offsetWidth;
- overlay.className=`caption-overlay anim-${currentAnim}`;overlay.style.setProperty("--dur",`${.55/parseFloat($("#speedRange").value||1)}s`);overlay.style.setProperty("--stagger",`${$("#staggerRange").value}s`);
- captionText.style.fontWeight=weight;captionText.style.fontStyle=italic?"italic":"normal";captionText.style.fontFamily=`'${currentFont}',sans-serif`;
- captionText.style.fontSize=`${$("#sizeRange").value}px`;captionText.style.letterSpacing=`${$("#spacingRange").value}px`;captionText.style.textShadow=`0 0 ${$("#glowRange").value}px ${$("#glowColor").value},0 2px ${$("#outlineRange").value}px #000`;
- captionText.style.color=$("#textColor").value;overlay.style.setProperty("--glow",$("#glowColor").value);
+function renderCaptions(){
+ const box=$("#captionsTab");
+ box.innerHTML=`<div class="panel-title">Caption track <span style="float:right;color:#7f8799;font-size:11px">${state.captions.length} segments</span></div>${state.captions.length?state.captions.map((c,i)=>`<div class="caption-card ${i===state.selected?"active":""}" data-i="${i}"><textarea class="ctext">${esc(c.text)}</textarea><div class="time-row"><input class="start" type="number" min="0" step=".01" value="${c.start}"><input class="end" type="number" min="0" step=".01" value="${c.end}"><button class="delete">Delete</button></div></div>`).join(""):`<div style="color:#727b8f;font-size:13px;padding:10px 0">No captions yet. Paste a transcript above or import an SRT.</div>`}`;
+ $$("#captionsTab .caption-card").forEach(card=>{
+  const i=+card.dataset.i;card.onclick=()=>{state.selected=i;video.currentTime=state.captions[i].start;renderCaptions();renderPreview()};
+  card.querySelector(".ctext").oninput=e=>{commit();state.captions[i].text=e.target.value;renderPreview()};
+  card.querySelector(".start").oninput=e=>{commit();state.captions[i].start=Math.max(0,+e.target.value);normalize();renderCaptions();renderPreview()};
+  card.querySelector(".end").oninput=e=>{commit();state.captions[i].end=Math.max(state.captions[i].start+.05,+e.target.value);normalize();renderCaptions();renderPreview()};
+  card.querySelector(".delete").onclick=e=>{e.stopPropagation();commit();state.captions.splice(i,1);state.selected=Math.max(0,i-1);renderCaptions();renderPreview()};
+ });
 }
-function renderCaptionList(){
- $("#captionCount").textContent=`${captions.length} segments`;
- $("#captionList").innerHTML=captions.map((c,i)=>`<div class="caption-item"><textarea data-i="${i}">${c.text}</textarea><div class="caption-meta"><input data-start="${i}" type="number" step=".01" value="${c.start}"><input data-end="${i}" type="number" step=".01" value="${c.end}"><button data-del="${i}">Delete</button></div></div>`).join("");
- $$("#captionList textarea").forEach(x=>x.oninput=e=>{captions[+e.target.dataset.i].text=e.target.value;renderCaption()});
- $$("#captionList [data-start]").forEach(x=>x.onchange=e=>{captions[+e.target.dataset.start].start=+e.target.value});
- $$("#captionList [data-end]").forEach(x=>x.onchange=e=>{captions[+e.target.dataset.end].end=+e.target.value});
- $$("#captionList [data-del]").forEach(x=>x.onclick=e=>{saveState();captions.splice(+e.target.dataset.del,1);renderCaptionList();renderCaption()});
+function esc(s){return String(s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]))}
+function normalize(){state.captions.sort((a,b)=>a.start-b.start)}
+function renderAll(){renderPresets();renderFonts();renderAnimation();renderCaptions();renderPreview()}
+function activeCaption(t=video.currentTime){return state.captions.findIndex(c=>t>=c.start&&t<c.end)}
+function renderPreview(){
+ const i=activeCaption();overlay.innerHTML="";
+ if(i<0){return}
+ const c=state.captions[i]; const words=c.text.trim().split(/\s+/).filter(Boolean);
+ const progress=(video.currentTime-c.start)/Math.max(.05,c.end-c.start);
+ const activeWord=Math.min(words.length-1,Math.floor(progress*words.length));
+ const wrap=document.createElement("div");wrap.className="caption";
+ const mapFont=fonts.find(x=>x[0]===state.font);wrap.style.fontFamily=state._fontStack||mapFont?.[1]||"system-ui";
+ wrap.style.color=state.textColor;wrap.style.fontSize=state.size+"px";wrap.style.textAlign=state.align;
+ wrap.style.letterSpacing=state.letterSpacing+"px";wrap.style.setProperty("--accent",state.accent);wrap.style.setProperty("--glow",state.glow);wrap.style.setProperty("--animdur",state.animationDuration+"s");
+ wrap.style.webkitTextStroke=`${state.strokeWidth}px ${state.stroke}`;wrap.style.textShadow=state.shadow?`0 3px 16px #000,0 0 ${Math.max(4,state.strokeWidth*4)}px ${state.glow}`:"none";
+ if(state.background){wrap.style.background=`${state.bgColor}${Math.round(state.bgOpacity*255).toString(16).padStart(2,"0")}`;wrap.style.padding="10px 15px";wrap.style.borderRadius=state.radius+"px"}
+ if(state.position) overlay.style.bottom=state.position+"%";
+ const cls={"Fade":"anim-fade","Pop":"anim-pop","Bounce":"anim-bounce","Slide Up":"anim-slide-up","Slide Left":"anim-slide-left","Zoom":"anim-zoom","Glow Pulse":"anim-glow","Typewriter":"anim-type","Karaoke":"anim-karaoke"}[state.animation];
+ if(cls)wrap.classList.add(cls);
+ words.forEach((w,j)=>{const s=document.createElement("span");s.className="word"+(j===activeWord?" active":"");s.textContent=w;s.style.marginRight="0.28em";if(state.animation==="Typewriter")s.style.animationDelay=(j*.035)+"s";wrap.appendChild(s)});
+ overlay.appendChild(wrap);
 }
-$("#mediaInput").onchange=e=>{let f=e.target.files[0];if(!f)return;mediaURL=URL.createObjectURL(f);video.src=mediaURL;$("#fileName").textContent=f.name;empty.style.display="none";video.onloadedmetadata=()=>{$("#duration").textContent=fmt(video.duration);$("#scrubber").max=video.duration};toast("Media loaded")};
-video.ontimeupdate=()=>{$("#currentTime").textContent=fmt(video.currentTime);$("#scrubber").value=video.currentTime;let c=getActive();if(c&&c.text!==captionText.textContent)renderCaption()};
-$("#scrubber").oninput=e=>video.currentTime=+e.target.value;
-function fmt(s){if(!isFinite(s))return"0:00";return `${Math.floor(s/60)}:${String(Math.floor(s%60)).padStart(2,"0")}`}
-$("#addCaptionBtn").onclick=()=>{saveState();let t=video.currentTime||0;captions.push({start:t,end:Math.min((video.duration||t+3),t+3),text:"New caption"});selectedCaption=captions.length-1;renderCaptionList();renderCaption();toast("Caption added")};
-$("#clearBtn").onclick=()=>{saveState();captions=[];renderCaptionList();renderCaption()};
-$("#generateBtn").onclick=async()=>{
- if(!video.src){toast("Upload a video first");return}
- const btn=$("#generateBtn");
- const file=$("#mediaInput").files?.[0];
- if(!file){toast("Please choose the video again");return}
- btn.disabled=true;
- const old=btn.textContent;
- try{
-   btn.textContent="Loading AI…";
-   const whisper=await getWhisper();
-   btn.textContent="Extracting audio…";
-   const audio=await extractMono16k(file);
-   const lang=$("#languageSelect")?.value || "hi";
-   btn.textContent="Generating captions…";
-   const result=await whisper(audio,{
-     language:lang,
-     task:"transcribe",
-     return_timestamps:true,
-     chunk_length_s:30,
-     stride_length_s:5,
-     callback_function:()=>{}
-   });
-   captions=makeSegments(result);
-   selectedCaption=0;
-   renderCaptionList();
-   renderCaption();
-   toast(captions.length?`${captions.length} caption segments ready ✓`:"No speech detected");
- }catch(err){
-   console.error(err);
-   toast("Caption AI failed — try again or add captions manually");
- }finally{
-   btn.disabled=false;
-   btn.textContent=old;
- }
+function addCaption(start=video.currentTime,end=Math.min(video.duration||10,video.currentTime+2),text="New caption"){commit();state.captions.push({id:uid(),start:+start.toFixed(2),end:+end.toFixed(2),text});normalize();state.selected=state.captions.length-1;renderCaptions();renderPreview()}
+function generateFromTranscript(){
+ const text=$("#transcript").value.trim();if(!text){toast("Paste the transcript first");return}
+ if(!video.duration){toast("Upload a video first");return}
+ commit();
+ const parts=text.replace(/\s+/g," ").split(/(?<=[.!?])\s+|(?=\n)/).map(x=>x.trim()).filter(Boolean);
+ const chunks=[];let words=[];
+ parts.forEach(p=>{p.split(/\s+/).forEach(w=>{words.push(w);if(words.length>=8){chunks.push(words.join(" "));words=[]}});if(words.length){chunks.push(words.join(" "));words=[]}});
+ const dur=video.duration, slice=dur/Math.max(1,chunks.length);
+ state.captions=chunks.map((t,i)=>({id:uid(),start:+(i*slice).toFixed(2),end:+((i+1)*slice).toFixed(2),text:t}));
+ state.selected=0;renderAll();toast(`${state.captions.length} captions created`);
+}
+function parseSrt(txt){
+ const blocks=txt.replace(/\r/g,"").trim().split(/\n\s*\n/);const out=[];
+ for(const b of blocks){const lines=b.split("\n");const tm=lines.find(x=>x.includes("-->"));if(!tm)continue;const [a,z]=tm.split("-->").map(x=>x.trim());const parse=x=>{const m=x.match(/(\d+):(\d+):(\d+),(\d+)/);return m?(+m[1]*3600+ +m[2]*60+ +m[3]+ +m[4]/1000):0};const text=lines.slice(lines.indexOf(tm)+1).join(" ").trim();if(text)out.push({id:uid(),start:parse(a),end:parse(z),text})}return out;
+}
+function exportSrt(){
+ if(!state.captions.length){toast("No captions to export");return}
+ const txt=state.captions.map((c,i)=>`${i+1}\n${srtTime(c.start)} --> ${srtTime(c.end)}\n${c.text}\n`).join("\n");
+ const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([txt],{type:"text/plain"}));a.download="glowing-captions.srt";a.click();URL.revokeObjectURL(a.href);toast("SRT exported");
+}
+$("#fileInput").onchange=e=>{const f=e.target.files[0];if(!f)return;$("#fileName").textContent=f.name;video.src=URL.createObjectURL(f);video.load();empty.style.display="none";state.captions=[];renderAll()};
+video.onloadedmetadata=()=>{$("#duration").textContent=fmt(video.duration);$("#scrubber").max=video.duration;toast("Video ready")};
+video.ontimeupdate=()=>{$("#currentTime").textContent=fmt(video.currentTime);$("#scrubber").value=video.currentTime;const i=activeCaption();if(i!==state.selected){state.selected=i>=0?i:state.selected;renderCaptions()}renderPreview()};
+$("#playBtn").onclick=()=>{if(video.paused)video.play();else video.pause()};
+video.onplay=()=>$("#playBtn").textContent="❚❚";video.onpause=()=>$("#playBtn").textContent="▶";
+$("#scrubber").oninput=e=>{video.currentTime=+e.target.value;renderPreview()};$("#volume").oninput=e=>video.volume=+e.target.value;
+$("#generateBtn").onclick=generateFromTranscript;$("#addCaptionBtn").onclick=()=>addCaption();$("#clearBtn").onclick=()=>{commit();state.captions=[];renderAll()};
+$("#exportSrtBtn").onclick=exportSrt;
+$("#importSrtBtn").onclick=()=>$("#srtInput").click();
+$("#srtInput").onchange=async e=>{const f=e.target.files[0];if(!f)return;commit();state.captions=parseSrt(await f.text());normalize();state.selected=0;renderAll();toast("SRT imported")};
+$("#undoBtn").onclick=()=>{if(!history.length)return;future.push(snapshot());restore(history.pop())};
+$("#redoBtn").onclick=()=>{if(!future.length)return;history.push(snapshot());restore(future.pop())};
+$$(".tab").forEach(b=>b.onclick=()=>{$$(".tab").forEach(x=>x.classList.remove("active"));$$(".tab-panel").forEach(x=>x.classList.remove("active"));b.classList.add("active");$("#"+b.dataset.tab+"Tab").classList.add("active")});
+$$(".ratio button").forEach(b=>b.onclick=()=>{const r=b.dataset.ratio;$$(".ratio button").forEach(x=>x.classList.remove("active"));b.classList.add("active");stage.className="stage "+({"9:16":"ratio-916","1:1":"ratio-11","16:9":"ratio-169"}[r])});
+$("#micBtn").onclick=()=>{
+ const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+ if(!SR){toast("Live speech is not supported in this browser");return}
+ const r=new SR();r.lang="en-IN";r.interimResults=false;r.continuous=false;r.onresult=e=>{$("#transcript").value+=(($("#transcript").value?" ":"")+e.results[0][0].transcript);toast("Speech added to transcript")};r.onerror=()=>toast("Microphone speech failed");r.start();toast("Listening… speak now");
 };
-$("#exportBtn").onclick=()=>{
- if(!captions.length){toast("No captions to export");return}
- let srt=captions.map((c,i)=>`${i+1}\n${srtTime(c.start)} --> ${srtTime(c.end)}\n${c.text}\n`).join("\n");
- let a=document.createElement("a");a.href=URL.createObjectURL(new Blob([srt],{type:"text/plain"}));a.download="captions.srt";a.click();toast("SRT exported");
-};
-function srtTime(s){let h=Math.floor(s/3600),m=Math.floor(s%3600/60),sec=Math.floor(s%60),ms=Math.floor((s%1)*1000);return `${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}:${String(sec).padStart(2,"0")},${String(ms).padStart(3,"0")}`}
-$$(".tab").forEach(t=>t.onclick=()=>{$$(".tab").forEach(x=>x.classList.remove("active"));$$(".tab-panel").forEach(x=>x.classList.remove("active"));t.classList.add("active");$("#"+t.dataset.tab).classList.add("active")});
-$$(".ratio").forEach(r=>r.onclick=()=>{$$(".ratio").forEach(x=>x.classList.remove("active"));r.classList.add("active");stage.className=`stage ratio-${r.dataset.ratio.replace("/","")}`});
-$$("[data-weight]").forEach(b=>b.onclick=()=>{saveState();weight=+b.dataset.weight;$$("[data-weight]").forEach(x=>x.classList.remove("active"));b.classList.add("active");renderCaption()});
-$("#italicBtn").onclick=()=>{saveState();italic=!italic;$("#italicBtn").classList.toggle("active",italic);renderCaption()};
-$("#capsBtn").onclick=()=>{saveState();transformCase="upper";renderCaption()};
-$("#lowerBtn").onclick=()=>{saveState();transformCase="lower";renderCaption()};
-["textColor","accentColor","glowColor","bgColor","glowRange","outlineRange","sizeRange","spacingRange","speedRange","staggerRange"].forEach(id=>$("#"+id).oninput=renderCaption);
-$("#undoBtn").onclick=()=>{if(!history.length)return;future.push(JSON.stringify({captions,selectedCaption,currentStyle,currentFont,currentAnim,weight,italic,transformCase}));let s=JSON.parse(history.pop());Object.assign(window,s);captions=s.captions;selectedCaption=s.selectedCaption;currentStyle=s.currentStyle;currentFont=s.currentFont;currentAnim=s.currentAnim;weight=s.weight;italic=s.italic;transformCase=s.transformCase;renderPresets();renderFonts();renderAnimations();renderCaptionList();renderCaption()};
-$("#redoBtn").onclick=()=>{if(!future.length)return;let s=JSON.parse(future.pop());history.push(JSON.stringify({captions,selectedCaption,currentStyle,currentFont,currentAnim,weight,italic,transformCase}));captions=s.captions;selectedCaption=s.selectedCaption;currentStyle=s.currentStyle;currentFont=s.currentFont;currentAnim=s.currentAnim;weight=s.weight;italic=s.italic;transformCase=s.transformCase;renderPresets();renderFonts();renderAnimations();renderCaptionList();renderCaption()};
-renderPresets();renderFonts();renderAnimations();renderCaptionList();applyPreset(presets[0]);renderCaption();
+renderAll();
