@@ -3,90 +3,142 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <meta name="theme-color" content="#080b14">
-  <title>GlowCaption AI</title>
+  <meta name="theme-color" content="#090b12">
+  <title>GLOWING.AI — Next Level Caption Studio</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
+  <header class="topbar">
+    <div class="brand"><span class="brand-dot"></span><span>GLOWING<span>.AI</span></span><small>CAPTION STUDIO</small></div>
+    <div class="top-actions">
+      <button id="clearBtn" class="ghost">Clear</button>
+      <button id="exportBtn" class="primary">Export SRT</button>
+    </div>
+  </header>
+
   <main class="app">
-    <header class="hero">
-      <div class="badge">GLOWCAPTION AI</div>
-      <h1>Auto captions that <span>GLOW ✨</span></h1>
-      <p>Local browser transcription. No API key or upload server required.</p>
-    </header>
-
-    <section class="card">
-      <label class="upload" id="dropZone">
-        <input id="videoInput" type="file" accept="video/*,audio/*">
-        <strong>Choose a video or audio file</strong>
-        <span>or drag & drop it here</span>
+    <section class="hero">
+      <div>
+        <p class="eyebrow">NEXT LEVEL • MOBILE FIRST</p>
+        <h1>Make captions <span>GLOW.</span></h1>
+        <p class="sub">Upload a video, generate captions, then style every word with premium fonts, glow, gradients and motion.</p>
+      </div>
+      <label class="upload-card" id="dropZone">
+        <input id="mediaInput" type="file" accept="video/*,audio/*">
+        <div class="upload-icon">＋</div>
+        <b>Choose video or audio</b>
+        <span>MP4, WebM, MOV, MP3, WAV and more</span>
       </label>
-
-      <div id="fileInfo" class="file-info hidden"></div>
-
-      <div class="controls-grid">
-        <label>
-          Language
-          <select id="language">
-            <option value="auto">Auto detect</option>
-            <option value="en">English</option>
-            <option value="hi">Hindi</option>
-            <option value="ur">Urdu</option>
-            <option value="bn">Bengali</option>
-            <option value="ta">Tamil</option>
-            <option value="te">Telugu</option>
-            <option value="mr">Marathi</option>
-            <option value="gu">Gujarati</option>
-            <option value="pa">Punjabi</option>
-            <option value="ar">Arabic</option>
-            <option value="es">Spanish</option>
-            <option value="fr">French</option>
-            <option value="de">German</option>
-          </select>
-        </label>
-        <label>
-          Caption size
-          <input id="fontSize" type="range" min="20" max="64" value="34">
-        </label>
-        <label>
-          Caption position
-          <select id="position">
-            <option value="bottom">Bottom</option>
-            <option value="middle">Middle</option>
-            <option value="top">Top</option>
-          </select>
-        </label>
-      </div>
-
-      <button id="transcribeBtn" class="primary" disabled>Generate captions</button>
-
-      <div id="status" class="status hidden">
-        <div class="status-row"><span id="statusText">Preparing…</span><span id="percent">0%</span></div>
-        <progress id="progress" value="0" max="100"></progress>
-        <small id="detail"></small>
-      </div>
     </section>
 
-    <section id="previewCard" class="card hidden">
-      <div class="section-title">Preview</div>
-      <div id="videoStage" class="video-stage">
-        <video id="video" controls playsinline></video>
-        <div id="captionOverlay" class="caption-overlay"></div>
+    <section class="workspace">
+      <div class="preview-card">
+        <div class="preview-head">
+          <b>LIVE PREVIEW</b>
+          <span id="statusPill" class="pill">Ready</span>
+        </div>
+        <div class="stage-wrap">
+          <div id="stage" class="stage theme-neon">
+            <video id="video" playsinline controls></video>
+            <div id="captionLayer" class="caption-layer">
+              <div id="captionText" class="caption-text anim-pop">Your captions will appear here</div>
+            </div>
+            <div id="emptyStage" class="empty-stage">
+              <div>✦</div><span>Upload a video to start</span>
+            </div>
+          </div>
+        </div>
+        <div class="timeline">
+          <div class="time-row"><span id="currentTime">00:00</span><span id="duration">00:00</span></div>
+          <input id="seek" type="range" min="0" max="100" value="0">
+        </div>
       </div>
-      <div class="caption-list-wrap">
-        <div class="section-title">Captions</div>
-        <div id="captionList" class="caption-list"></div>
-      </div>
-      <div class="actions">
-        <button id="downloadSrt" disabled>Download SRT</button>
-        <button id="downloadVtt" disabled>Download VTT</button>
-        <button id="clearBtn" class="danger">Start over</button>
+
+      <div class="editor-card">
+        <div class="tabs">
+          <button class="tab active" data-tab="styles">Styles</button>
+          <button class="tab" data-tab="fonts">Fonts</button>
+          <button class="tab" data-tab="motion">Animation</button>
+          <button class="tab" data-tab="captions">Captions</button>
+        </div>
+
+        <div class="tab-panel active" id="styles">
+          <div class="section-title"><b>Premium presets</b><span>Tap to apply</span></div>
+          <div id="presetGrid" class="preset-grid"></div>
+
+          <div class="control-grid">
+            <label>Text color <input id="textColor" type="color" value="#ffffff"></label>
+            <label>Accent <input id="accentColor" type="color" value="#00e5ff"></label>
+            <label>Glow <input id="glowColor" type="color" value="#00e5ff"></label>
+            <label>Background <input id="bgColor" type="color" value="#05060b"></label>
+          </div>
+
+          <div class="sliders">
+            <label>Size <output id="sizeOut">42</output><input id="size" type="range" min="18" max="92" value="42"></label>
+            <label>Glow <output id="glowOut">22</output><input id="glow" type="range" min="0" max="60" value="22"></label>
+            <label>Outline <output id="outlineOut">2</output><input id="outline" type="range" min="0" max="8" value="2"></label>
+            <label>Roundness <output id="radiusOut">18</output><input id="radius" type="range" min="0" max="40" value="18"></label>
+          </div>
+          <div class="segmented" id="weightGroup">
+            <button data-weight="400">Regular</button><button data-weight="600">Semi</button><button class="selected" data-weight="800">Bold</button><button data-weight="900">Black</button>
+          </div>
+          <div class="segmented" id="styleGroup">
+            <button class="selected" data-style="normal">Normal</button><button data-style="italic">Italic</button><button data-style="oblique">Oblique</button>
+          </div>
+        </div>
+
+        <div class="tab-panel" id="fonts">
+          <div class="section-title"><b>Font collection</b><span>Modern + creator</span></div>
+          <div id="fontGrid" class="font-grid"></div>
+          <div class="control-grid">
+            <label>Letter spacing <input id="spacing" type="range" min="-2" max="8" step=".5" value="0"></label>
+            <label>Line height <input id="lineHeight" type="range" min=".8" max="1.5" step=".05" value="1.05"></label>
+          </div>
+        </div>
+
+        <div class="tab-panel" id="motion">
+          <div class="section-title"><b>Caption animation</b><span>Live CSS motion</span></div>
+          <div id="animGrid" class="anim-grid"></div>
+          <div class="control-grid">
+            <label>Animation speed <input id="animSpeed" type="range" min=".25" max="2.5" step=".05" value="1"></label>
+            <label>Word highlight <select id="highlightMode"><option value="none">Off</option><option value="current">Current word</option><option value="all">All words</option></select></label>
+          </div>
+        </div>
+
+        <div class="tab-panel" id="captions">
+          <div class="section-title"><b>Caption track</b><span id="segmentCount">0 segments</span></div>
+          <div class="caption-tools">
+            <button id="generateBtn" class="primary wide">Generate captions</button>
+            <select id="language">
+              <option value="hi-IN">Hindi</option>
+              <option value="en-US">English</option>
+              <option value="ur-PK">Urdu</option>
+              <option value="bn-IN">Bengali</option>
+              <option value="mr-IN">Marathi</option>
+            </select>
+          </div>
+          <p class="hint">The app first tries browser speech recognition. You can always edit the generated text manually. This avoids displaying corrupted/concatenated caption strings.</p>
+          <div id="captionList" class="caption-list">
+            <div class="empty-list">No caption segments yet.</div>
+          </div>
+          <button id="addCaptionBtn" class="secondary wide">＋ Add caption</button>
+        </div>
       </div>
     </section>
-
-    <footer>Best results: clear speech, low background noise, and a modern Chrome/Edge browser.</footer>
   </main>
 
-  <script type="module" src="app.js"></script>
+  <template id="captionItemTemplate">
+    <div class="caption-item">
+      <div class="caption-row">
+        <input class="start" type="number" min="0" step=".1" placeholder="Start">
+        <input class="end" type="number" min="0" step=".1" placeholder="End">
+        <button class="playSeg">▶</button>
+        <button class="deleteSeg">×</button>
+      </div>
+      <textarea class="caption-edit" rows="2" placeholder="Caption text…"></textarea>
+    </div>
+  </template>
+
+  <script src="app.js"></script>
 </body>
 </html>
