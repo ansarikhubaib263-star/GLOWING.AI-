@@ -8,6 +8,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Anton&family=Bebas+Neue&family=DM+Sans:wght@400;500;700;900&family=Inter:wght@400;600;800;900&family=Montserrat:wght@400;600;800;900&family=Oswald:wght@400;600;700&family=Pacifico&family=Playfair+Display:ital,wght@0,700;1,700&family=Poppins:wght@400;600;800;900&family=Roboto+Condensed:wght@400;700&family=Space+Grotesk:wght@400;600;700&family=Titan+One&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
+<script type="module" src="app.js"></script>
 </head>
 <body>
   <header class="topbar">
@@ -51,6 +52,19 @@
       </div>
 
       <div class="caption-tools">
+        <label class="lang-control">Language
+          <select id="languageSelect">
+            <option value="hi">Hindi</option>
+            <option value="en">English</option>
+            <option value="ur">Urdu</option>
+            <option value="bn">Bengali</option>
+            <option value="ta">Tamil</option>
+            <option value="te">Telugu</option>
+            <option value="mr">Marathi</option>
+            <option value="gu">Gujarati</option>
+            <option value="pa">Punjabi</option>
+          </select>
+        </label>
         <button id="generateBtn" class="primary">Generate captions</button>
         <button id="addCaptionBtn">＋ Add caption</button>
         <button id="clearBtn">Clear</button>
@@ -106,6 +120,6 @@
   </main>
 
   <div id="toast" class="toast"></div>
-  <script src="app.js"></script>
+  
 </body>
 </html>
