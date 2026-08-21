@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>GlowCaption Offline AI</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header><div class="logo">GLOW<span>CAPTION</span> <b>AI</b></div><div class="status" id="status">● Ready</div></header>
+<main>
+<section class="hero"><p>SERVERLESS • IN YOUR BROWSER</p><h1>Auto captions that <span>GLOW ✨</span></h1><small>No backend or API key. Processing happens locally when supported by your browser.</small></section>
+<section class="grid">
+<div class="card preview">
+  <div class="stage">
+    <video id="video" controls playsinline></video>
+    <div id="captionBox"><span id="captionText">UPLOAD A VIDEO<br>AND CREATE GLOWING CAPTIONS ✨</span></div>
+    <label id="dropZone"><input id="file" type="file" accept="video/*,audio/*" hidden><div class="upload">↑</div><b>Upload Video</b><small>MP4 • MOV • WEBM • Audio</small></label>
+  </div>
+  <div class="timeline"><button id="play">▶</button><input id="seek" type="range" min="0" max="100" value="0"><span id="time">00:00 / 00:00</span></div>
+</div>
+<div class="card controls">
+<h2>AI Caption Generator</h2>
+<button id="generate" class="primary">🤖 Generate Auto Captions</button>
+<p class="hint">First use may download the speech-recognition model into your browser cache.</p>
+<div class="progress"><div id="bar"></div></div>
+<div id="modelInfo" class="info">Model: not loaded</div>
+<label>Caption text<textarea id="text">UPLOAD A VIDEO AND CREATE GLOWING CAPTIONS ✨</textarea></label>
+<div class="twocol"><label>Glow<input id="glowColor" type="color" value="#00f7ff"></label><label>Text<input id="textColor" type="color" value="#ffffff"></label></div>
+<label>Font size <span id="fsVal">38px</span><input id="fontSize" type="range" min="20" max="72" value="38"></label>
+<label>Glow strength <span id="gsVal">28</span><input id="glowStrength" type="range" min="0" max="60" value="28"></label>
+<label>Position<select id="position"><option value="top">Top</option><option value="center">Center</option><option value="bottom" selected>Bottom</option></select></label>
+<label class="check"><span>Word-by-word preview animation</span><input id="animate" type="checkbox" checked></label>
+<div class="buttons"><button id="apply">✨ Apply Style</button><button id="downloadSrt">⬇ Download SRT</button></div>
+</div>
+</section>
+<section class="note"><h3>How this serverless version works</h3><p>Your media stays in the browser for playback and editing. Auto transcription uses a browser-side speech-recognition library/model loaded from the web on first use. For large videos, use a computer or process shorter clips.</p></section>
+</main>
+<script type="module" src="app.js"></script>
+</body></html>
