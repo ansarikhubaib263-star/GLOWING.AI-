@@ -1,17 +1,16 @@
-# GlowCaption AI v2
+# GLOWING.AI — Caption Studio V5
+A mobile-first caption editor inspired by the visual language of modern caption editors such as the screenshot supplied by the user.
 
-A static GitHub Pages auto-caption app using Whisper in the browser.
+Included:
+- Premium preset cards
+- Multiple typography families
+- Bold/black/italic/case controls
+- Glow, outline, size and spacing controls
+- Word-by-word caption animations
+- Video preview and timeline
+- Caption track editor
+- Browser SpeechRecognition attempt
+- SRT export
+- 9:16, 1:1 and 16:9 preview ratios
 
-## Files
-- `index.html`
-- `style.css`
-- `app.js`
-
-## Deploy
-Upload all three files to the repository root and keep GitHub Pages set to:
-- Source: Deploy from a branch
-- Branch: `main`
-- Folder: `/ (root)`
-
-## Notes
-The Whisper model is downloaded by the browser on first use. Large/long videos can be slow or memory-heavy on phones. This version intentionally does not pretend that browser transcription is perfect: it shows errors instead of silently producing a successful-looking result.
+GitHub Pages: upload/replace `index.html`, `style.css`, and `app.js` in the repository root.
