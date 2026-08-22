@@ -1,16 +1,649 @@
-✦ GLOWING.AI
-↶ ↷ Export SRT
-PREVIEW
-9:16 1:1 16:9
-▶
-Choose a video or audio Upload MP4/WebM/MOV to start
-0:00 
- 0:00
-▶ 
-＋ Choose video or audioNo file chosen No file selected
-Generate from transcript ＋ Add caption Clear
-Transcript for caption generation 
-Paste the spoken text here. The app will split it into timed caption segments.
-This version never invents speech. Browser-only automatic transcription from an uploaded video's audio needs a speech-to-text engine/API.
-Import SRT 🎙 Live speech
-Styles Fonts Animation Captions
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Kaption Forge — Script to Styled Captions</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* ============ Tokens ============ */
+:root{
+  --bg: #0B0D10;
+  --panel: #14171C;
+  --panel-2: #1A1E24;
+  --border: #262B33;
+  --text: #EDEEF2;
+  --text-muted: #8A8F98;
+  --accent: #FF7A1A;
+  --accent-2: #33D6C0;
+  --danger: #FF4F5E;
+
+  --font-display: 'Bebas Neue', 'Arial Narrow', sans-serif;
+  --font-ui: 'Space Grotesk', 'Inter', sans-serif;
+  --font-body: 'Inter', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+}
+
+*{ box-sizing: border-box; }
+html,body{ margin:0; padding:0; }
+body{
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-body);
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection{ background: var(--accent-2); color:#06110F; }
+
+/* ============ Signature: film perforation strip ============ */
+.perf-strip{
+  height: 10px;
+  width: 100%;
+  background-image: repeating-linear-gradient(
+    90deg,
+    var(--panel-2) 0 6px,
+    transparent 6px 16px
+  );
+  background-color: var(--bg);
+  border-bottom: 1px solid var(--border);
+}
+
+/* ============ Topbar ============ */
+.topbar{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding: 16px 28px;
+  border-bottom: 1px solid var(--border);
+}
+.brand{ display:flex; align-items:center; gap:12px; }
+.brand-mark{
+  font-family: var(--font-display);
+  font-size: 22px;
+  letter-spacing: 1px;
+  background: var(--accent);
+  color: #1A0D00;
+  width: 38px; height: 38px;
+  border-radius: 8px;
+  display:flex; align-items:center; justify-content:center;
+  transform: rotate(-4deg);
+}
+.brand-text{ display:flex; flex-direction:column; line-height:1.15; }
+.brand-name{ font-family: var(--font-ui); font-weight:700; font-size:17px; letter-spacing:0.2px; }
+.brand-tag{ font-family: var(--font-mono); font-size:11px; color: var(--text-muted); }
+
+.topbar-status{
+  display:flex; align-items:center; gap:8px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-muted);
+  border:1px solid var(--border);
+  padding: 6px 12px;
+  border-radius: 100px;
+}
+.topbar-status .dot{
+  width:7px; height:7px; border-radius:50%;
+  background: var(--danger);
+}
+.topbar-status.ready .dot{ background: var(--accent-2); }
+.topbar-status.ready{ color: var(--accent-2); border-color: rgba(51,214,192,0.35); }
+
+/* ============ Layout ============ */
+.layout{
+  display:grid;
+  grid-template-columns: 400px 1fr;
+  gap: 1px;
+  background: var(--border);
+  min-height: calc(100vh - 130px);
+}
+@media (max-width: 920px){
+  .layout{ grid-template-columns: 1fr; }
+}
+
+.panel{
+  background: var(--bg);
+  padding: 24px;
+}
+
+/* ============ Controls ============ */
+.controls{ overflow-y:auto; }
+.control-block{ margin-bottom: 28px; }
+.control-title{
+  font-family: var(--font-ui);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  display:flex; align-items:center; gap:8px;
+  margin: 0 0 6px 0;
+}
+.control-title .idx{
+  font-family: var(--font-mono);
+  color: var(--accent);
+  font-size: 11px;
+}
+.control-hint{
+  font-size: 12.5px;
+  color: var(--text-muted);
+  margin: 0 0 12px 0;
+  line-height:1.5;
+}
+
+/* Dropzone */
+.dropzone{
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  gap: 6px;
+  border: 1.5px dashed var(--border);
+  border-radius: 10px;
+  padding: 26px 16px;
+  cursor:pointer;
+  color: var(--text-muted);
+  transition: border-color .15s ease, color .15s ease, background .15s ease;
+}
+.dropzone:hover, .dropzone.drag-over{
+  border-color: var(--accent);
+  color: var(--text);
+  background: rgba(255,122,26,0.05);
+}
+.drop-icon{ color: var(--accent); }
+.drop-label{ font-family: var(--font-ui); font-size: 13px; font-weight:500; }
+.drop-sub{ font-family: var(--font-mono); font-size: 11px; }
+
+/* Transcript */
+.transcript-input{
+  width:100%;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 13.5px;
+  line-height:1.6;
+  padding: 12px 14px;
+  resize: vertical;
+}
+.transcript-input:focus{ outline:none; border-color: var(--accent); }
+.transcript-meta{
+  display:flex; justify-content:space-between;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 6px;
+}
+
+/* Fields */
+.field-row{
+  display:grid;
+  grid-template-columns: 110px 1fr 30px;
+  align-items:center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.field-row label{ font-size: 12.5px; color: var(--text-muted); }
+.field-row input[type="range"]{ accent-color: var(--accent); width:100%; }
+.field-row input[type="number"]{
+  grid-column: 2 / span 2;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  padding: 6px 8px;
+  font-family: var(--font-mono);
+  width: 90px;
+}
+.field-value{ font-family: var(--font-mono); font-size: 12px; text-align:right; }
+
+/* Buttons */
+.btn{
+  font-family: var(--font-ui);
+  font-weight: 600;
+  font-size: 13.5px;
+  border-radius: 8px;
+  padding: 11px 16px;
+  border: none;
+  cursor: pointer;
+  transition: transform .1s ease, opacity .15s ease, background .15s ease;
+  width: 100%;
+}
+.btn:disabled{ opacity: 0.4; cursor: not-allowed; }
+.btn-generate{
+  background: var(--accent);
+  color: #1A0D00;
+  margin-top: 4px;
+}
+.btn-generate:not(:disabled):hover{ transform: translateY(-1px); }
+.btn-outline{
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text);
+}
+.btn-outline:not(:disabled):hover{ border-color: var(--accent-2); color: var(--accent-2); }
+.export-row{ display:flex; gap: 10px; }
+
+/* Style grid */
+.style-grid{
+  display:grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.style-card{
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px 6px;
+  display:flex; flex-direction:column; align-items:center; gap:6px;
+  cursor:pointer;
+  min-height: 60px;
+  justify-content:center;
+  transition: border-color .15s ease, background .15s ease;
+}
+.style-card:hover{ border-color: rgba(255,122,26,0.5); }
+.style-card.active{ border-color: var(--accent); background: rgba(255,122,26,0.06); }
+.style-card .style-preview-text{ font-family: var(--font-display); font-size: 15px; letter-spacing: 0.5px; }
+.style-card .style-name{ font-family: var(--font-mono); font-size: 9.5px; color: var(--text-muted); text-transform:uppercase; letter-spacing:0.3px; }
+
+/* ============ Preview ============ */
+.preview-panel{ display:flex; flex-direction:column; align-items:center; gap:18px; }
+
+.phone-frame{
+  position:relative;
+  width: 260px;
+  aspect-ratio: 9/16;
+  background: #000;
+  border-radius: 26px;
+  border: 6px solid #1E2229;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+  overflow:hidden;
+}
+.phone-notch{
+  position:absolute; top:0; left:50%; transform:translateX(-50%);
+  width: 90px; height: 18px;
+  background: #1E2229;
+  border-radius: 0 0 12px 12px;
+  z-index: 5;
+}
+.phone-screen{
+  position:absolute; inset:0;
+  background: linear-gradient(160deg,#12151a,#05070a);
+  display:flex; align-items:flex-end; justify-content:center;
+}
+#videoEl{ position:absolute; inset:0; width:100%; height:100%; object-fit:cover; }
+.no-media-msg{
+  display:flex; flex-direction:column; align-items:center; gap:8px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  text-align:center;
+  padding: 0 20px;
+}
+
+.caption-box{
+  position:absolute;
+  left: 8%; right: 8%;
+  bottom: 12%;
+  text-align:center;
+  z-index: 4;
+  pointer-events:none;
+  min-height: 40px;
+}
+.caption-box .cap-line{
+  display:inline-flex;
+  flex-wrap:wrap;
+  justify-content:center;
+  gap: 0.32em;
+}
+
+/* ============ Transport ============ */
+.transport{
+  width: 100%;
+  max-width: 460px;
+  display:grid;
+  grid-template-columns: auto auto 1fr auto;
+  align-items:center;
+  gap: 12px;
+}
+.transport-btn{
+  width: 36px; height:36px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--text);
+  display:flex; align-items:center; justify-content:center;
+  cursor:pointer;
+}
+.transport-btn:disabled{ opacity:0.4; cursor:not-allowed; }
+.time-code{ font-family: var(--font-mono); font-size: 11px; color: var(--text-muted); }
+
+.scrubber{
+  position:relative;
+  height: 26px;
+  cursor:pointer;
+}
+.scrubber-track{
+  position:absolute; top:50%; left:0; right:0; height:4px;
+  transform: translateY(-50%);
+  background: var(--panel-2);
+  border-radius: 3px;
+}
+.scrubber-fill{
+  position:absolute; top:50%; left:0; height:4px; width:0%;
+  transform: translateY(-50%);
+  background: var(--accent);
+  border-radius: 3px;
+}
+.cue-blocks{
+  position:absolute; top:50%; left:0; right:0; height:8px;
+  transform: translateY(-50%);
+  display:flex;
+  pointer-events:none;
+}
+.cue-blocks .cue-block{
+  height:100%;
+  border-right: 1px solid var(--bg);
+  background: rgba(51,214,192,0.18);
+}
+.scrubber-handle{
+  position:absolute; top:50%; left:0%;
+  width: 14px; height:14px;
+  background: var(--accent);
+  border-radius: 50%;
+  transform: translate(-50%,-50%);
+  /* clapperboard diagonal stripe motif on handle */
+  background-image: repeating-linear-gradient(45deg, rgba(0,0,0,0.25) 0 2px, transparent 2px 4px);
+  box-shadow: 0 0 0 3px rgba(255,122,26,0.2);
+}
+
+.footer-note{
+  text-align:center;
+  padding: 14px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-muted);
+  border-top: 1px solid var(--border);
+}
+
+/* =====================================================
+   CAPTION STYLE PRESETS
+   Applied to #captionBox via data-style attribute
+   ===================================================== */
+
+/* base word unit */
+.cap-word{ display:inline-block; }
+
+/* --- glow-green: neon green glow, bold caps --- */
+[data-style="glow-green"] .cap-line{
+  font-family: var(--font-display);
+  font-size: 26px;
+  color: #B6FF3C;
+  text-shadow: 0 0 6px #B6FF3C, 0 0 18px rgba(182,255,60,0.7);
+}
+[data-style="glow-green"] .cap-word.active{ color:#fff; text-shadow:0 0 8px #fff, 0 0 20px #B6FF3C; }
+
+/* --- shadow-white: bold white, hard drop shadow --- */
+[data-style="shadow-white"] .cap-line{
+  font-family: var(--font-ui);
+  font-weight: 700;
+  font-size: 21px;
+  color: #fff;
+  text-shadow: 2px 2px 0 rgba(0,0,0,0.9), 4px 4px 8px rgba(0,0,0,0.5);
+}
+
+/* --- two-tone: base white, active word amber --- */
+[data-style="two-tone"] .cap-line{
+  font-family: var(--font-ui);
+  font-weight: 700;
+  font-size: 21px;
+  color: rgba(255,255,255,0.55);
+}
+[data-style="two-tone"] .cap-word.active{ color: var(--accent); }
+
+/* --- clean-minimal: thin, one word at a time feel --- */
+[data-style="clean-minimal"] .cap-line{
+  font-family: var(--font-body);
+  font-weight: 400;
+  font-size: 19px;
+  color: #fff;
+  letter-spacing: 0.3px;
+}
+[data-style="clean-minimal"] .cap-word.active{ font-weight:700; }
+
+/* --- bubble: active word gets pill background --- */
+[data-style="bubble"] .cap-line{
+  font-family: var(--font-ui);
+  font-weight: 600;
+  font-size: 18px;
+  color: #fff;
+}
+[data-style="bubble"] .cap-word.active{
+  background: var(--accent-2);
+  color: #06110F;
+  padding: 2px 9px;
+  border-radius: 100px;
+}
+
+/* --- bold-outline: white fill, black outline, big caps --- */
+[data-style="bold-outline"] .cap-line{
+  font-family: var(--font-display);
+  font-size: 30px;
+  color: #fff;
+  -webkit-text-stroke: 2px #000;
+  paint-order: stroke fill;
+}
+
+/* --- block-bg: active word solid block background --- */
+[data-style="block-bg"] .cap-line{
+  font-family: var(--font-ui);
+  font-weight: 700;
+  font-size: 19px;
+  color: #fff;
+}
+[data-style="block-bg"] .cap-word.active{
+  background: var(--accent);
+  color: #1A0D00;
+  padding: 3px 8px;
+  border-radius: 4px;
+}
+
+/* --- deep-glow: magenta neon --- */
+[data-style="deep-glow"] .cap-line{
+  font-family: var(--font-display);
+  font-size: 27px;
+  color: #FF3CC7;
+  text-shadow: 0 0 8px #FF3CC7, 0 0 22px rgba(255,60,199,0.8);
+}
+
+</style>
+</head>
+<body>
+
+  <!-- Film perforation strip, top -->
+  <div class="perf-strip" aria-hidden="true"></div>
+
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark">KF</span>
+      <div class="brand-text">
+        <span class="brand-name">Kaption Forge</span>
+        <span class="brand-tag">script&nbsp;→&nbsp;timed, styled captions</span>
+      </div>
+    </div>
+    <div class="topbar-status" id="statusPill">
+      <span class="dot"></span>
+      <span id="statusText">Waiting for media</span>
+    </div>
+  </header>
+
+  <main class="layout">
+
+    <!-- LEFT: controls -->
+    <section class="panel controls" aria-label="Caption controls">
+
+      <div class="control-block">
+        <h2 class="control-title"><span class="idx">01</span> Load media</h2>
+        <p class="control-hint">Drop the audio or video this transcript belongs to. It's only used locally, for timing.</p>
+        <label class="dropzone" id="dropzone" for="mediaInput">
+          <input type="file" id="mediaInput" accept="audio/*,video/*" hidden />
+          <svg class="drop-icon" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6">
+            <path d="M12 3v12m0-12 4 4m-4-4-4 4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/>
+          </svg>
+          <span class="drop-label" id="dropLabel">Tap to choose a file, or drop it here</span>
+          <span class="drop-sub" id="dropSub">MP3, WAV, MP4, MOV…</span>
+        </label>
+      </div>
+
+      <div class="control-block">
+        <h2 class="control-title"><span class="idx">02</span> Paste script</h2>
+        <p class="control-hint">Paste the exact words spoken. We'll spread them evenly across the media's duration.</p>
+        <textarea id="transcript" class="transcript-input" placeholder="the quick brown fox jumps over the lazy dog…" rows="7"></textarea>
+        <div class="transcript-meta">
+          <span id="wordCount">0 words</span>
+          <span id="estCues">0 caption blocks</span>
+        </div>
+      </div>
+
+      <div class="control-block">
+        <h2 class="control-title"><span class="idx">03</span> Timing</h2>
+        <div class="field-row">
+          <label for="wordsPerCue">Words per caption</label>
+          <input type="range" id="wordsPerCue" min="1" max="8" value="3" />
+          <span class="field-value" id="wordsPerCueVal">3</span>
+        </div>
+        <div class="field-row">
+          <label for="startOffset">Start delay (s)</label>
+          <input type="number" id="startOffset" min="0" step="0.1" value="0" />
+        </div>
+        <button class="btn btn-generate" id="generateBtn" disabled>Generate captions</button>
+      </div>
+
+      <div class="control-block">
+        <h2 class="control-title"><span class="idx">04</span> Style</h2>
+        <p class="control-hint">Pick a look. Every style re-times to your media automatically.</p>
+        <div class="style-grid" id="styleGrid"><!-- injected by app.js --></div>
+      </div>
+
+      <div class="control-block export-block">
+        <h2 class="control-title"><span class="idx">05</span> Export</h2>
+        <div class="export-row">
+          <button class="btn btn-outline" id="exportSrt" disabled>Download .SRT</button>
+          <button class="btn btn-outline" id="exportJson" disabled>Download style .JSON</button>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- RIGHT: preview -->
+    <section class="panel preview-panel" aria-label="Live preview">
+
+      <div class="phone-frame">
+        <div class="phone-notch"></div>
+        <div class="phone-screen" id="phoneScreen">
+          <video id="videoEl" playsinline hidden></video>
+          <div class="no-media-msg" id="noMediaMsg">
+            <svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M4 4h16v16H4zM4 4l16 16M20 4 4 20"/></svg>
+            <span>Load media to preview captions</span>
+          </div>
+          <div class="caption-box" id="captionBox" aria-live="polite"></div>
+        </div>
+      </div>
+
+      <audio id="audioEl" hidden></audio>
+
+      <div class="transport">
+        <button class="transport-btn" id="playBtn" disabled aria-label="Play">
+          <svg id="playIcon" viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+        </button>
+        <span class="time-code" id="timeCurrent">00:00.0</span>
+        <div class="scrubber" id="scrubber">
+          <div class="scrubber-track"></div>
+          <div class="scrubber-fill" id="scrubberFill"></div>
+          <div class="cue-blocks" id="cueBlocks"></div>
+          <div class="scrubber-handle" id="scrubberHandle"></div>
+        </div>
+        <span class="time-code" id="timeTotal">00:00.0</span>
+      </div>
+
+    </section>
+
+  </main>
+
+  <footer class="footer-note">
+    Runs entirely in your browser — nothing you upload leaves this page.
+  </footer>
+
+  <script>
+(() => {
+  "use strict";
+
+  /* ---------- style catalogue ---------- */
+  const STYLES = [
+    { id: "glow-green",   name: "Glow Green",    preview: "BROWN" },
+    { id: "shadow-white", name: "Shadow",        preview: "BROWN" },
+    { id: "two-tone",     name: "Highlight",     preview: "the quick" },
+    { id: "clean-minimal",name: "Clean",         preview: "brown" },
+    { id: "bubble",       name: "Bubble",        preview: "the fox" },
+    { id: "bold-outline", name: "Bold Outline",  preview: "FOX" },
+    { id: "block-bg",     name: "Block",         preview: "the fox" },
+    { id: "deep-glow",    name: "Deep Glow",     preview: "BROWN" },
+  ];
+
+  /* ---------- state ---------- */
+  const state = {
+    mediaEl: null,        // active <video> or <audio>
+    mediaType: null,      // 'video' | 'audio'
+    duration: 0,
+    cues: [],             // [{start,end,words:[{text,start,end}]}]
+    styleId: "glow-green",
+    scrubbing: false,
+  };
+
+  /* ---------- element refs ---------- */
+  const el = (id) => document.getElementById(id);
+  const mediaInput   = el("mediaInput");
+  const dropzone      = el("dropzone");
+  const dropLabel     = el("dropLabel");
+  const dropSub       = el("dropSub");
+  const transcript     = el("transcript");
+  const wordCountEl    = el("wordCount");
+  const estCuesEl      = el("estCues");
+  const wordsPerCue    = el("wordsPerCue");
+  const wordsPerCueVal = el("wordsPerCueVal");
+  const startOffset    = el("startOffset");
+  const generateBtn    = el("generateBtn");
+  const styleGrid       = el("styleGrid");
+  const exportSrtBtn    = el("exportSrt");
+  const exportJsonBtn   = el("exportJson");
+
+  const videoEl   = el("videoEl");
+  const audioEl   = el("audioEl");
+  const phoneScreen = el("phoneScreen");
+  const noMediaMsg = el("noMediaMsg");
+  const captionBox = el("captionBox");
+
+  const playBtn    = el("playBtn");
+  const playIcon   = el("playIcon");
+  const timeCurrent = el("timeCurrent");
+  const timeTotal   = el("timeTotal");
+  const scrubber      = el("scrubber");
+  const scrubberFill  = el("scrubberFill");
+  const scrubberHandle= el("scrubberHandle");
+  const cueBlocksEl   = el("cueBlocks");
+
+  const statusPill = el("statusPill");
+  const statusText = el("statusText");
+
+  /* ---------- style grid render ---------- */
+  function renderStyleGrid(){
+    styleGrid.innerHTML = "";
+    STYLES.forEach(s => {
+      const card = document.createElement("button");
+      card.type = "button";
+      card.className = "style-card" + (s.id === state.styleId ? " active" : "");
+      card.dataset.style = s.id;
+      card.innerHTML = `
+        <span class="style-preview-text" data-style="${s.id}">
+          <span class="cap-word active">${s.preview}</span>
+        </span>
+        <span class="style-name">${s.name}</sp
