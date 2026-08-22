@@ -1,330 +1,160 @@
-(() => {
-  "use strict";
+const $ = id => document.getElementById(id);
+const videoInput = $("videoInput"), video = $("video"), stage = $("videoStage");
+const status = $("status"), generateBtn = $("generateCaptions"), overlay = $("captionOverlay");
+const track = $("captionsTrack"), stylesGrid = $("stylesGrid"), seek = $("seek");
+const currentTime = $("currentTime"), durationEl = $("duration"), playBtn = $("playBtn");
+const wordsRange = $("wordsPerCaption"), wordCount = $("wordCount");
 
-  /* ---------- style catalogue ---------- */
-  const STYLES = [
-    { id: "glow-green",   name: "Glow Green",    preview: "BROWN" },
-    { id: "shadow-white", name: "Shadow",        preview: "BROWN" },
-    { id: "two-tone",     name: "Highlight",     preview: "the quick" },
-    { id: "clean-minimal",name: "Clean",         preview: "brown" },
-    { id: "bubble",       name: "Bubble",        preview: "the fox" },
-    { id: "bold-outline", name: "Bold Outline",  preview: "FOX" },
-    { id: "block-bg",     name: "Block",         preview: "the fox" },
-    { id: "deep-glow",    name: "Deep Glow",     preview: "BROWN" },
-  ];
+let captions = [], currentCue = -1;
+let selectedStyle = {name:"Neon Glow", color:"#d7ff34", effect:"pop", glow:true};
 
-  /* ---------- state ---------- */
-  const state = {
-    mediaEl: null,        // active <video> or <audio>
-    mediaType: null,      // 'video' | 'audio'
-    duration: 0,
-    cues: [],             // [{start,end,words:[{text,start,end}]}]
-    styleId: "glow-green",
-    scrubbing: false,
-  };
+const styles = [
+  {name:"Neon Glow",color:"#d7ff34",effect:"glow",glow:true},
+  {name:"Clean Pop",color:"#ffffff",effect:"pop",glow:false},
+  {name:"Orange Bounce",color:"#ff8a00",effect:"bounce",glow:true},
+  {name:"Purple Slide",color:"#b46cff",effect:"slide",glow:true},
+  {name:"Ice Blue",color:"#63dcff",effect:"pop",glow:true},
+  {name:"Red Impact",color:"#ff4b4b",effect:"bounce",glow:true},
+  {name:"Gold",color:"#ffd24d",effect:"slide",glow:true},
+  {name:"White Cinema",color:"#fff",effect:"glow",glow:true},
+  {name:"Green Punch",color:"#4dff9a",effect:"bounce",glow:true}
+];
 
-  /* ---------- element refs ---------- */
-  const el = (id) => document.getElementById(id);
-  const mediaInput   = el("mediaInput");
-  const dropzone      = el("dropzone");
-  const dropLabel     = el("dropLabel");
-  const dropSub       = el("dropSub");
-  const transcript     = el("transcript");
-  const wordCountEl    = el("wordCount");
-  const estCuesEl      = el("estCues");
-  const wordsPerCue    = el("wordsPerCue");
-  const wordsPerCueVal = el("wordsPerCueVal");
-  const startOffset    = el("startOffset");
-  const generateBtn    = el("generateBtn");
-  const styleGrid       = el("styleGrid");
-  const exportSrtBtn    = el("exportSrt");
-  const exportJsonBtn   = el("exportJson");
+function setStatus(text, type="") {
+  status.textContent = "● " + text;
+  status.className = "status " + type;
+}
+function fmt(t){ if(!isFinite(t)) return "00:00.0"; const m=Math.floor(t/60),s=Math.floor(t%60); return `${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}.${Math.floor((t%1)*10)}`; }
 
-  const videoEl   = el("videoEl");
-  const audioEl   = el("audioEl");
-  const phoneScreen = el("phoneScreen");
-  const noMediaMsg = el("noMediaMsg");
-  const captionBox = el("captionBox");
-
-  const playBtn    = el("playBtn");
-  const playIcon   = el("playIcon");
-  const timeCurrent = el("timeCurrent");
-  const timeTotal   = el("timeTotal");
-  const scrubber      = el("scrubber");
-  const scrubberFill  = el("scrubberFill");
-  const scrubberHandle= el("scrubberHandle");
-  const cueBlocksEl   = el("cueBlocks");
-
-  const statusPill = el("statusPill");
-  const statusText = el("statusText");
-
-  /* ---------- style grid render ---------- */
-  function renderStyleGrid(){
-    styleGrid.innerHTML = "";
-    STYLES.forEach(s => {
-      const card = document.createElement("button");
-      card.type = "button";
-      card.className = "style-card" + (s.id === state.styleId ? " active" : "");
-      card.dataset.style = s.id;
-      card.innerHTML = `
-        <span class="style-preview-text" data-style="${s.id}">
-          <span class="cap-word active">${s.preview}</span>
-        </span>
-        <span class="style-name">${s.name}</span>
-      `;
-      card.addEventListener("click", () => {
-        state.styleId = s.id;
-        [...styleGrid.children].forEach(c => c.classList.remove("active"));
-        card.classList.add("active");
-        captionBox.dataset.style = s.id;
-      });
-      styleGrid.appendChild(card);
-    });
-  }
-  renderStyleGrid();
-  captionBox.dataset.style = state.styleId;
-
-  /* ---------- media loading ---------- */
-  function humanFileType(file){
-    return file.type.startsWith("video") ? "video" : "audio";
-  }
-
-  function loadMedia(file){
-    const url = URL.createObjectURL(file);
-    state.mediaType = humanFileType(file);
-
-    if (state.mediaType === "video"){
-      videoEl.src = url;
-      videoEl.hidden = false;
-      audioEl.removeAttribute("src");
-      state.mediaEl = videoEl;
-      noMediaMsg.style.display = "none";
-    } else {
-      audioEl.src = url;
-      videoEl.hidden = true;
-      state.mediaEl = audioEl;
-      noMediaMsg.style.display = "flex";
-      noMediaMsg.querySelector("span").textContent = file.name;
-    }
-
-    state.mediaEl.addEventListener("loadedmetadata", onMediaReady, { once: true });
-    dropLabel.textContent = file.name;
-    dropSub.textContent = `${state.mediaType.toUpperCase()} loaded — reading duration…`;
-  }
-
-  function onMediaReady(){
-    state.duration = state.mediaEl.duration || 0;
-    timeTotal.textContent = formatClock(state.duration);
-    dropSub.textContent = `Duration ${formatClock(state.duration)}`;
-    playBtn.disabled = false;
-    setStatus(true, "Media ready");
-    bindTransport();
-    updateGenerateAvailability();
-  }
-
-  dropzone.addEventListener("click", () => mediaInput.click());
-  mediaInput.addEventListener("change", (e) => {
-    const f = e.target.files[0];
-    if (f) loadMedia(f);
-  });
-  ["dragover","dragenter"].forEach(ev => dropzone.addEventListener(ev, (e) => {
-    e.preventDefault(); dropzone.classList.add("drag-over");
-  }));
-  ["dragleave","drop"].forEach(ev => dropzone.addEventListener(ev, (e) => {
-    e.preventDefault(); dropzone.classList.remove("drag-over");
-  }));
-  dropzone.addEventListener("drop", (e) => {
-    const f = e.dataTransfer.files[0];
-    if (f) loadMedia(f);
-  });
-
-  function setStatus(ready, text){
-    statusText.textContent = text;
-    statusPill.classList.toggle("ready", ready);
-  }
-
-  /* ---------- transcript meta ---------- */
-  function getWords(){
-    return transcript.value.trim().split(/\s+/).filter(Boolean);
-  }
-  function refreshTranscriptMeta(){
-    const words = getWords();
-    wordCountEl.textContent = `${words.length} words`;
-    const per = parseInt(wordsPerCue.value, 10);
-    const cues = words.length ? Math.ceil(words.length / per) : 0;
-    estCuesEl.textContent = `${cues} caption blocks`;
-    updateGenerateAvailability();
-  }
-  transcript.addEventListener("input", refreshTranscriptMeta);
-  wordsPerCue.addEventListener("input", () => {
-    wordsPerCueVal.textContent = wordsPerCue.value;
-    refreshTranscriptMeta();
-  });
-
-  function updateGenerateAvailability(){
-    generateBtn.disabled = !(state.duration > 0 && getWords().length > 0);
-  }
-
-  /* ---------- cue generation ---------- */
-  function buildCues(){
-    const words = getWords();
-    const per = parseInt(wordsPerCue.value, 10);
-    const offset = parseFloat(startOffset.value) || 0;
-    const usable = Math.max(state.duration - offset, 0.5);
-    const groups = [];
-    for (let i = 0; i < words.length; i += per){
-      groups.push(words.slice(i, i + per));
-    }
-    const cueDur = usable / groups.length;
-
-    state.cues = groups.map((g, idx) => {
-      const cueStart = offset + idx * cueDur;
-      const cueEnd = cueStart + cueDur;
-      const wordDur = cueDur / g.length;
-      const words = g.map((w, wi) => ({
-        text: w,
-        start: cueStart + wi * wordDur,
-        end: cueStart + (wi + 1) * wordDur,
-      }));
-      return { start: cueStart, end: cueEnd, words };
-    });
-
-    renderCueBlocks();
-    exportSrtBtn.disabled = false;
-    exportJsonBtn.disabled = false;
-    setStatus(true, `${state.cues.length} captions generated`);
-  }
-
-  generateBtn.addEventListener("click", buildCues);
-
-  function renderCueBlocks(){
-    cueBlocksEl.innerHTML = "";
-    if (!state.duration) return;
-    state.cues.forEach(c => {
-      const block = document.createElement("div");
-      block.className = "cue-block";
-      const widthPct = ((c.end - c.start) / state.duration) * 100;
-      block.style.width = `${widthPct}%`;
-      cueBlocksEl.appendChild(block);
-    });
-  }
-
-  /* ---------- playback + caption sync ---------- */
-  function bindTransport(){
-    state.mediaEl.addEventListener("timeupdate", onTick);
-    state.mediaEl.addEventListener("ended", () => setPlayIcon(false));
-  }
-
-  function onTick(){
-    if (!state.scrubbing){
-      const t = state.mediaEl.currentTime;
-      timeCurrent.textContent = formatClock(t);
-      const pct = state.duration ? (t / state.duration) * 100 : 0;
-      scrubberFill.style.width = `${pct}%`;
-      scrubberHandle.style.left = `${pct}%`;
-    }
-    renderActiveCaption();
-  }
-
-  function renderActiveCaption(){
-    if (!state.cues.length){ captionBox.innerHTML = ""; return; }
-    const t = state.mediaEl.currentTime;
-    const cue = state.cues.find(c => t >= c.start && t < c.end);
-    if (!cue){ captionBox.innerHTML = ""; return; }
-
-    const html = cue.words.map(w => {
-      const active = t >= w.start && t < w.end;
-      return `<span class="cap-word${active ? " active" : ""}">${escapeHtml(w.text)}</span>`;
-    }).join("");
-    captionBox.innerHTML = `<span class="cap-line">${html}</span>`;
-  }
-
-  playBtn.addEventListener("click", () => {
-    if (!state.mediaEl) return;
-    if (state.mediaEl.paused){
-      state.mediaEl.play();
-      setPlayIcon(true);
-    } else {
-      state.mediaEl.pause();
-      setPlayIcon(false);
-    }
-  });
-
-  function setPlayIcon(isPlaying){
-    playIcon.innerHTML = isPlaying
-      ? `<path d="M6 5h4v14H6zM14 5h4v14h-4z"/>`
-      : `<path d="M8 5v14l11-7z"/>`;
-  }
-
-  /* ---------- scrubbing ---------- */
-  function seekFromEvent(e){
-    const rect = scrubber.getBoundingClientRect();
-    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-    const pct = Math.min(Math.max((clientX - rect.left) / rect.width, 0), 1);
-    const t = pct * state.duration;
-    if (state.mediaEl) state.mediaEl.currentTime = t;
-    scrubberFill.style.width = `${pct * 100}%`;
-    scrubberHandle.style.left = `${pct * 100}%`;
-    timeCurrent.textContent = formatClock(t);
-    renderActiveCaption();
-  }
-  scrubber.addEventListener("mousedown", (e) => { state.scrubbing = true; seekFromEvent(e); });
-  window.addEventListener("mousemove", (e) => { if (state.scrubbing) seekFromEvent(e); });
-  window.addEventListener("mouseup", () => { state.scrubbing = false; });
-  scrubber.addEventListener("touchstart", (e) => { state.scrubbing = true; seekFromEvent(e); });
-  scrubber.addEventListener("touchmove", (e) => { if (state.scrubbing) seekFromEvent(e); });
-  window.addEventListener("touchend", () => { state.scrubbing = false; });
-
-  /* ---------- export ---------- */
-  function formatSrtTime(t){
-    const h = Math.floor(t / 3600);
-    const m = Math.floor((t % 3600) / 60);
-    const s = Math.floor(t % 60);
-    const ms = Math.round((t - Math.floor(t)) * 1000);
-    const pad = (n, l = 2) => String(n).padStart(l, "0");
-    return `${pad(h)}:${pad(m)}:${pad(s)},${pad(ms, 3)}`;
-  }
-
-  function buildSrt(){
-    return state.cues.map((c, i) => {
-      const text = c.words.map(w => w.text).join(" ");
-      return `${i + 1}\n${formatSrtTime(c.start)} --> ${formatSrtTime(c.end)}\n${text}\n`;
-    }).join("\n");
-  }
-
-  function download(filename, content, mime){
-    const blob = new Blob([content], { type: mime });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url; a.download = filename;
-    document.body.appendChild(a); a.click(); a.remove();
-    URL.revokeObjectURL(url);
-  }
-
-  exportSrtBtn.addEventListener("click", () => {
-    download("captions.srt", buildSrt(), "text/plain");
-  });
-  exportJsonBtn.addEventListener("click", () => {
-    const payload = {
-      style: state.styleId,
-      duration: state.duration,
-      cues: state.cues,
+function renderStyles(){
+  stylesGrid.innerHTML="";
+  styles.forEach((s,i)=>{
+    const b=document.createElement("button");
+    b.className="style-card"+(i===0?" active":"");
+    b.textContent="the quick BROWN fox";
+    b.style.color=s.color;
+    b.style.textShadow=s.glow?`0 0 12px ${s.color}`:"none";
+    b.onclick=()=>{
+      selectedStyle=s;
+      document.querySelectorAll(".style-card").forEach(x=>x.classList.remove("active"));
+      b.classList.add("active");
+      refreshCaption(true);
     };
-    download("captions-style.json", JSON.stringify(payload, null, 2), "application/json");
+    stylesGrid.appendChild(b);
   });
+}
 
-  /* ---------- helpers ---------- */
-  function formatClock(t){
-    if (!isFinite(t)) return "00:00.0";
-    const m = Math.floor(t / 60);
-    const s = (t % 60).toFixed(1).padStart(4, "0");
-    return `${String(m).padStart(2, "0")}:${s}`;
-  }
-  function escapeHtml(str){
-    return str.replace(/[&<>"']/g, (c) => ({
-      "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
-    }[c]));
-  }
+videoInput.addEventListener("change",()=>{
+  const f=videoInput.files[0];
+  if(!f) return;
+  video.src=URL.createObjectURL(f);
+  stage.classList.remove("empty");
+  captions=[]; currentCue=-1; track.innerHTML=""; overlay.textContent="";
+  setStatus("Media loaded: "+f.name,"ready");
+});
 
-  refreshTranscriptMeta();
-})();
+video.addEventListener("loadedmetadata",()=>{durationEl.textContent=fmt(video.duration);});
+video.addEventListener("timeupdate",()=>{
+  currentTime.textContent=fmt(video.currentTime);
+  seek.value=video.duration ? Math.round(video.currentTime/video.duration*1000) : 0;
+  refreshCaption(false);
+});
+seek.addEventListener("input",()=>{if(video.duration) video.currentTime=(seek.value/1000)*video.duration;});
+playBtn.onclick=()=>video.paused?video.play():video.pause();
+video.addEventListener("play",()=>playBtn.textContent="❚❚");
+video.addEventListener("pause",()=>playBtn.textContent="▶");
+
+wordsRange.addEventListener("input",()=>wordCount.textContent=wordsRange.value);
+
+function renderTrack(){
+  track.innerHTML="";
+  captions.forEach((c,i)=>{
+    const el=document.createElement("div"); el.className="cue"; el.dataset.i=i;
+    el.innerHTML=`<b>${c.text}</b><span>${fmt(c.start)} - ${fmt(c.end)}</span>`;
+    el.onclick=()=>{video.currentTime=c.start;video.play();};
+    track.appendChild(el);
+  });
+}
+
+function refreshCaption(force){
+  const idx=captions.findIndex(c=>video.currentTime>=c.start && video.currentTime<c.end);
+  if(idx===currentCue && !force) return;
+  currentCue=idx;
+  const c=captions[idx];
+  overlay.className="caption-overlay";
+  if(!c){overlay.textContent="";return;}
+  overlay.textContent=c.text;
+  overlay.style.color=selectedStyle.color;
+  void overlay.offsetWidth;
+  overlay.classList.add(selectedStyle.effect);
+  if(selectedStyle.glow) overlay.classList.add("glow");
+  document.querySelectorAll(".cue").forEach(x=>x.classList.toggle("active",Number(x.dataset.i)===idx));
+}
+
+function chunksToCaptions(chunks, text){
+  if(!chunks?.length){
+    return text?.trim() ? [{text:text.trim(),start:0,end:Math.max(video.duration||5,1)}] : [];
+  }
+  const out=[], group=[], limit=Number(wordsRange.value);
+  let start=null,end=null;
+  for(const ch of chunks){
+    const tx=String(ch.text||"").trim(); if(!tx) continue;
+    const ts=ch.timestamp||[0,0];
+    if(start===null) start=Number(ts[0])||0;
+    end=Number(ts[1])||start+.8;
+    group.push(tx);
+    if(group.join(" ").split(/\s+/).length>=limit || /[.!?]$/.test(tx)){
+      out.push({text:group.join(" ").trim(),start,end:Math.max(end,start+.5)});
+      group.length=0;start=null;end=null;
+    }
+  }
+  if(group.length) out.push({text:group.join(" ").trim(),start:start??0,end:Math.max(end??2,(start??0)+.5)});
+  return out;
+}
+
+async function getAudio(file){
+  const ctx=new (window.AudioContext||window.webkitAudioContext)();
+  const buf=await file.arrayBuffer();
+  const decoded=await ctx.decodeAudioData(buf.slice(0));
+  const mono=new Float32Array(decoded.length);
+  for(let ch=0;ch<decoded.numberOfChannels;ch++){
+    const data=decoded.getChannelData(ch);
+    for(let i=0;i<data.length;i++) mono[i]+=data[i]/decoded.numberOfChannels;
+  }
+  return {array:mono,sampling_rate:decoded.sampleRate};
+}
+
+generateBtn.onclick=async()=>{
+  const file=videoInput.files[0];
+  if(!file){setStatus("Pehle media upload karo.");return;}
+  try{
+    generateBtn.disabled=true;
+    setStatus("AI model loading... first time thoda wait karein.","loading");
+    const {pipeline,env}=await import("https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.7.2");
+    env.allowLocalModels=false;
+    const audio=await getAudio(file);
+    setStatus("Audio detect ho raha hai aur captions ban rahe hain...","loading");
+    const transcriber=await pipeline("automatic-speech-recognition","Xenova/whisper-tiny",{dtype:"q8"});
+    const lang=$("language").value;
+    const result=await transcriber(audio,{chunk_length_s:30,stride_length_s:5,return_timestamps:true,language:lang==="auto"?undefined:lang,task:"transcribe"});
+    captions=chunksToCaptions(result.chunks,result.text);
+    renderTrack(); refreshCaption(true);
+    setStatus(`${captions.length} captions generated!`,"ready");
+  }catch(e){
+    console.error(e);
+    setStatus("Auto caption failed. Chrome me MP3/WAV try karo, ya video audio format unsupported ho sakta hai.");
+  }finally{generateBtn.disabled=false;}
+};
+
+function download(name,text,type){
+  const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([text],{type}));a.download=name;a.click();URL.revokeObjectURL(a.href);
+}
+$("downloadSrt").onclick=()=>{
+  const s=captions.map((c,i)=>`${i+1}\n${srtTime(c.start)} --> ${srtTime(c.end)}\n${c.text}\n`).join("\n");
+  download("captions.srt",s,"text/plain");
+};
+$("downloadJson").onclick=()=>download("caption-style.json",JSON.stringify({style:selectedStyle,captions},null,2),"application/json");
+function srtTime(t){const h=Math.floor(t/3600),m=Math.floor(t%3600/60),s=Math.floor(t%60),ms=Math.floor((t%1)*1000);return `${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")},${String(ms).padStart(3,"0")}`;}
+
+renderStyles();
+setStatus("Waiting for media");
