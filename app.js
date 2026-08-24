@@ -15,17 +15,17 @@ const playBtn = $("playBtn");
 const wordsRange = $("wordsPerCaption");
 const wordCount = $("wordCount");
 
-const BACKEND_URL = "https://glowing-ai-backend.onrender.com";
-
 let captions = [];
 let currentCue = -1;
 
 let selectedStyle = {
   name: "Neon Glow",
   color: "#d7ff34",
-  effect: "pop",
+  effect: "glow",
   glow: true
 };
+
+const BACKEND_URL = "https://glowing-ai-backend.onrender.com";
 
 const styles = [
   {name:"Neon Glow",color:"#d7ff34",effect:"glow",glow:true},
@@ -46,10 +46,8 @@ function setStatus(text, type = "") {
 
 function fmt(t) {
   if (!isFinite(t)) return "00:00.0";
-
   const m = Math.floor(t / 60);
   const s = Math.floor(t % 60);
-
   return `${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}.${Math.floor((t % 1) * 10)}`;
 }
 
@@ -58,23 +56,15 @@ function renderStyles() {
 
   styles.forEach((s, i) => {
     const b = document.createElement("button");
-
     b.className = "style-card" + (i === 0 ? " active" : "");
     b.textContent = "the quick BROWN fox";
     b.style.color = s.color;
-    b.style.textShadow = s.glow
-      ? `0 0 12px ${s.color}`
-      : "none";
+    b.style.textShadow = s.glow ? `0 0 12px ${s.color}` : "none";
 
     b.onclick = () => {
       selectedStyle = s;
-
-      document
-        .querySelectorAll(".style-card")
-        .forEach(x => x.classList.remove("active"));
-
+      document.querySelectorAll(".style-card").forEach(x => x.classList.remove("active"));
       b.classList.add("active");
-
       refreshCaption(true);
     };
 
@@ -84,19 +74,14 @@ function renderStyles() {
 
 videoInput.addEventListener("change", () => {
   const f = videoInput.files[0];
-
   if (!f) return;
 
   video.src = URL.createObjectURL(f);
-
   stage.classList.remove("empty");
-
   captions = [];
   currentCue = -1;
-
   track.innerHTML = "";
   overlay.textContent = "";
-
   setStatus("Media loaded: " + f.name, "ready");
 });
 
@@ -106,70 +91,44 @@ video.addEventListener("loadedmetadata", () => {
 
 video.addEventListener("timeupdate", () => {
   currentTime.textContent = fmt(video.currentTime);
-
   seek.value = video.duration
     ? Math.round(video.currentTime / video.duration * 1000)
     : 0;
-
   refreshCaption(false);
 });
 
 seek.addEventListener("input", () => {
-  if (video.duration) {
-    video.currentTime = (seek.value / 1000) * video.duration;
-  }
+  if (video.duration) video.currentTime = (seek.value / 1000) * video.duration;
 });
 
-playBtn.onclick = () => {
-  video.paused ? video.play() : video.pause();
-};
+playBtn.onclick = () => video.paused ? video.play() : video.pause();
+video.addEventListener("play", () => playBtn.textContent = "❚❚");
+video.addEventListener("pause", () => playBtn.textContent = "▶");
 
-video.addEventListener("play", () => {
-  playBtn.textContent = "❚❚";
-});
-
-video.addEventListener("pause", () => {
-  playBtn.textContent = "▶";
-});
-
-wordsRange.addEventListener("input", () => {
-  wordCount.textContent = wordsRange.value;
-});
+wordsRange.addEventListener("input", () => wordCount.textContent = wordsRange.value);
 
 function renderTrack() {
   track.innerHTML = "";
 
   captions.forEach((c, i) => {
     const el = document.createElement("div");
-
     el.className = "cue";
     el.dataset.i = i;
-
-    el.innerHTML = `
-      <b>${c.text}</b>
-      <span>${fmt(c.start)} - ${fmt(c.end)}</span>
-    `;
-
+    el.innerHTML = `<b>${escapeHtml(c.text)}</b><span>${fmt(c.start)} - ${fmt(c.end)}</span>`;
     el.onclick = () => {
       video.currentTime = c.start;
       video.play();
     };
-
     track.appendChild(el);
   });
 }
 
 function refreshCaption(force) {
-  const idx = captions.findIndex(
-    c =>
-      video.currentTime >= c.start &&
-      video.currentTime < c.end
-  );
+  const idx = captions.findIndex(c => video.currentTime >= c.start && video.currentTime < c.end);
 
   if (idx === currentCue && !force) return;
 
   currentCue = idx;
-
   const c = captions[idx];
 
   overlay.className = "caption-overlay";
@@ -183,89 +142,25 @@ function refreshCaption(force) {
   overlay.style.color = selectedStyle.color;
 
   void overlay.offsetWidth;
-
   overlay.classList.add(selectedStyle.effect);
 
-  if (selectedStyle.glow) {
-    overlay.classList.add("glow");
-  }
+  if (selectedStyle.glow) overlay.classList.add("glow");
 
-  document
-    .querySelectorAll(".cue")
-    .forEach(x =>
-      x.classList.toggle(
-        "active",
-        Number(x.dataset.i) === idx
-      )
-    );
+  document.querySelectorAll(".cue").forEach(x =>
+    x.classList.toggle("active", Number(x.dataset.i) === idx)
+  );
 }
 
-function groupCaptions(segments) {
-  const result = [];
-
-  const limit =
-    Number(wordsRange.value) || 5;
-
-  let group = [];
-  let start = null;
-  let end = null;
-
-  for (const segment of segments || []) {
-    const text =
-      String(segment.text || "").trim();
-
-    if (!text) continue;
-
-    if (start === null) {
-      start = Number(segment.start) || 0;
-    }
-
-    end =
-      Number(segment.end) ||
-      (start + 1);
-
-    group.push(text);
-
-    const count =
-      group.join(" ")
-        .split(/\s+/)
-        .filter(Boolean)
-        .length;
-
-    if (
-      count >= limit ||
-      /[.!?]$/.test(text)
-    ) {
-      result.push({
-        text: group.join(" ").trim(),
-        start,
-        end: Math.max(end, start + 0.5)
-      });
-
-      group = [];
-      start = null;
-      end = null;
-    }
-  }
-
-  if (group.length) {
-    result.push({
-      text: group.join(" ").trim(),
-      start: start ?? 0,
-      end: Math.max(
-        end ?? 1,
-        (start ?? 0) + 0.5
-      )
-    });
-  }
-
-  return result;
+function escapeHtml(value) {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
 }
 
-/* ================================
-   AI CAPTION GENERATION
-================================ */
-
+/* Backend/OpenAI caption generation */
 generateBtn.onclick = async () => {
   const file = videoInput.files[0];
 
@@ -277,26 +172,32 @@ generateBtn.onclick = async () => {
   try {
     generateBtn.disabled = true;
 
-    setStatus(
-      "Video backend ko bheja ja raha hai...",
-      "loading"
+    setStatus("Backend se connection check ho raha hai...", "loading");
+
+    const healthResponse = await fetch(
+      `${BACKEND_URL}/api/health`,
+      { method: "GET", cache: "no-store" }
     );
+
+    if (!healthResponse.ok) {
+      throw new Error(`Backend health check failed (${healthResponse.status})`);
+    }
+
+    const health = await healthResponse.json();
+
+    if (!health.ok) {
+      throw new Error("Backend health check failed.");
+    }
 
     const formData = new FormData();
+    formData.append("file", file, file.name);
 
-    formData.append("file", file);
+    const languageElement = $("language");
+    const lang = languageElement ? languageElement.value : "auto";
 
-    const lang = $("language").value;
+    formData.append("language", lang === "auto" ? "auto" : lang);
 
-    formData.append(
-      "language",
-      lang === "auto" ? "auto" : lang
-    );
-
-    setStatus(
-      "AI captions generate ho rahe hain...",
-      "loading"
-    );
+    setStatus("AI transcription chal rahi hai...", "loading");
 
     const response = await fetch(
       `${BACKEND_URL}/api/captions`,
@@ -311,101 +212,66 @@ generateBtn.onclick = async () => {
     try {
       data = await response.json();
     } catch {
-      throw new Error(
-        `Backend ne invalid response diya. HTTP ${response.status}`
-      );
+      throw new Error(`Backend ne valid response nahi diya (${response.status}).`);
     }
 
     if (!response.ok || !data.ok) {
-      throw new Error(
-        data.error ||
-        `Backend error ${response.status}`
-      );
+      throw new Error(data.error || `Backend error ${response.status}`);
     }
 
-    captions = groupCaptions(data.captions);
+    captions = Array.isArray(data.captions) ? data.captions : [];
 
     if (!captions.length) {
-      throw new Error(
-        "Audio me speech/captions detect nahi hui."
-      );
+      throw new Error("Audio me speech/captions detect nahi hui.");
     }
 
     renderTrack();
     refreshCaption(true);
 
-    setStatus(
-      `${captions.length} captions generated!`,
-      "ready"
-    );
-
+    setStatus(`${captions.length} captions generated!`, "ready");
   } catch (e) {
-    console.error(e);
+    console.error("CAPTION FAILED:", e);
 
-    setStatus(
-      "Caption failed: " +
-      (e.message || "Unknown error")
-    );
+    let message = e?.message || "Unknown error";
 
+    if (message === "Failed to fetch") {
+      message = "Backend se connection nahi ho pa raha. Render deployment check karo.";
+    }
+
+    setStatus("Caption failed: " + message);
   } finally {
     generateBtn.disabled = false;
   }
 };
 
-/* ================================
-   DOWNLOAD
-================================ */
-
 function download(name, text, type) {
+  const blob = new Blob([text], { type });
+  const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
-
-  const url = URL.createObjectURL(
-    new Blob([text], { type })
-  );
 
   a.href = url;
   a.download = name;
-
   document.body.appendChild(a);
   a.click();
   a.remove();
 
-  setTimeout(() => {
-    URL.revokeObjectURL(url);
-  }, 1000);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 $("downloadSrt").onclick = () => {
-  const s = captions
-    .map(
-      (c, i) =>
-        `${i + 1}\n` +
-        `${srtTime(c.start)} --> ${srtTime(c.end)}\n` +
-        `${c.text}\n`
-    )
-    .join("\n");
+  const s = captions.map((c, i) =>
+    `${i + 1}\n${srtTime(c.start)} --> ${srtTime(c.end)}\n${c.text}\n`
+  ).join("\n");
 
-  download(
-    "captions.srt",
-    s,
-    "text/plain"
-  );
+  download("captions.srt", s, "text/plain");
 };
 
-$("downloadJson").onclick = () => {
+$("downloadJson").onclick = () =>
   download(
     "caption-style.json",
-    JSON.stringify(
-      {
-        style: selectedStyle,
-        captions
-      },
-      null,
-      2
-    ),
+    JSON.stringify({ style: selectedStyle, captions }, null, 2),
     "application/json"
   );
-};
 
 function srtTime(t) {
   const h = Math.floor(t / 3600);
@@ -413,14 +279,8 @@ function srtTime(t) {
   const s = Math.floor(t % 60);
   const ms = Math.floor((t % 1) * 1000);
 
-  return (
-    `${String(h).padStart(2,"0")}:` +
-    `${String(m).padStart(2,"0")}:` +
-    `${String(s).padStart(2,"0")},` +
-    `${String(ms).padStart(3,"0")}`
-  );
+  return `${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")},${String(ms).padStart(3,"0")}`;
 }
 
 renderStyles();
-
 setStatus("Waiting for media");
