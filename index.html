@@ -1,848 +1,518 @@
-// GLOWING AI — AI SHORTS FRONTEND
-// Step 2: YouTube URL + 5 Best Clips UI + Caption Presets
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>GLOWING AI — AI Shorts Studio</title>
+  <link rel="stylesheet" href="style.css">
 
-const $ = (id) => document.getElementById(id);
+  <style>
+    .youtube-box {
+      margin-top: 22px;
+      padding: 20px;
+      border: 1px solid rgba(255,255,255,.1);
+      border-radius: 18px;
+      background: rgba(255,255,255,.035);
+    }
 
-// -------------------------
-// ELEMENTS
-// -------------------------
+    .youtube-box h3 {
+      margin: 0 0 6px;
+    }
 
-const youtubeUrl = $("youtubeUrl");
-const analyzeYoutube = $("analyzeYoutube");
-const youtubeProcessing = $("youtubeProcessing");
-const youtubeProgress = $("youtubeProgress");
-const youtubeProgressText = $("youtubeProgressText");
+    .youtube-box p {
+      margin: 0 0 14px;
+      opacity: .65;
+      font-size: 13px;
+    }
 
-const clipsGrid = $("clipsGrid");
-const clipsCount = $("clipsCount");
+    .youtube-row {
+      display: flex;
+      gap: 10px;
+    }
 
-const videoInput = $("videoInput");
-const chooseVideo = $("chooseVideo");
-const uploadTop = $("uploadTop");
-const dropZone = $("dropZone");
+    .youtube-row input {
+      flex: 1;
+      min-width: 0;
+      padding: 14px 15px;
+      border-radius: 12px;
+      border: 1px solid rgba(255,255,255,.12);
+      background: #111;
+      color: white;
+      outline: none;
+    }
 
-const video = $("video");
-const videoStage = $("videoStage");
-const emptyState = $("emptyState");
-const status = $("status");
+    .youtube-row button {
+      white-space: nowrap;
+    }
 
-const generateCaptions = $("generateCaptions");
-const captionOverlay = $("captionOverlay");
+    .clips-section {
+      margin-top: 22px;
+    }
 
-const stylesGrid = $("stylesGrid");
-const presetCount = $("presetCount");
+    .clips-grid {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 14px;
+      margin-top: 15px;
+    }
 
-const wordsPerCaption = $("wordsPerCaption");
-const wordCount = $("wordCount");
+    .clip-card {
+      padding: 12px;
+      border-radius: 16px;
+      background: rgba(255,255,255,.045);
+      border: 1px solid rgba(255,255,255,.08);
+      transition: .2s;
+      cursor: pointer;
+    }
 
-const fontSize = $("fontSize");
-const fontSizeValue = $("fontSizeValue");
+    .clip-card:hover {
+      transform: translateY(-3px);
+      border-color: rgba(215,255,52,.45);
+    }
 
-const captionPosition = $("captionPosition");
-const aspectRatio = $("aspectRatio");
+    .clip-thumb {
+      aspect-ratio: 9/16;
+      border-radius: 12px;
+      background:
+        linear-gradient(145deg,#181818,#050505);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 30px;
+      margin-bottom: 10px;
+    }
 
-const playBtn = $("playBtn");
-const seek = $("seek");
-const currentTime = $("currentTime");
-const duration = $("duration");
+    .clip-card b {
+      display: block;
+      font-size: 14px;
+      margin-bottom: 5px;
+    }
 
+    .clip-card small {
+      opacity: .6;
+    }
 
-// -------------------------
-// STATE
-// -------------------------
+    .score {
+      display: inline-block;
+      margin-top: 8px;
+      padding: 4px 8px;
+      border-radius: 20px;
+      background: rgba(215,255,52,.1);
+      color: #d7ff34;
+      font-size: 11px;
+    }
 
-let selectedClip = null;
-let captions = [];
+    .processing {
+      display: none;
+      margin-top: 15px;
+    }
 
-let selectedStyle = {
-  name: "Neon Glow",
-  color: "#d7ff34",
-  effect: "pop",
-  glow: true
-};
+    .processing.active {
+      display: block;
+    }
 
+    @media(max-width:900px) {
+      .clips-grid {
+        grid-template-columns: repeat(2,1fr);
+      }
 
-// -------------------------
-// CAPTION PRESETS
-// -------------------------
+      .youtube-row {
+        flex-direction: column;
+      }
+    }
+  </style>
+</head>
 
-const styles = [
+<body>
 
-  {
-    name: "Neon Glow",
-    color: "#d7ff34",
-    effect: "pop",
-    glow: true
-  },
+<header>
+  <b>🟢 GLOWING AI</b>
 
-  {
-    name: "Clean Pop",
-    color: "#ffffff",
-    effect: "pop",
-    glow: false
-  },
+  <div>
+    <button id="uploadTop">Upload video</button>
+    <button id="exportSrt">Export SRT</button>
+  </div>
+</header>
 
-  {
-    name: "Orange Bounce",
-    color: "#ff7a00",
-    effect: "bounce",
-    glow: true
-  },
+<main>
 
-  {
-    name: "Purple Slide",
-    color: "#b76cff",
-    effect: "slide",
-    glow: true
-  },
+<section class="hero">
+  <div>
+    <small>AI SHORTS STUDIO</small>
 
-  {
-    name: "Ice Blue",
-    color: "#6ee7ff",
-    effect: "fade",
-    glow: true
-  },
+    <h1>
+      Turn long videos into
+      <em>viral Shorts.</em>
+    </h1>
 
-  {
-    name: "Karaoke",
-    color: "#ffe600",
-    effect: "karaoke",
-    glow: true
-  },
+    <p>
+      Find the best moments • Auto captions • 9:16 Shorts
+    </p>
+  </div>
 
-  {
-    name: "Bold Viral",
-    color: "#ffffff",
-    effect: "viral",
-    glow: false
-  },
-
-  {
-    name: "Glitch",
-    color: "#00ffff",
-    effect: "glitch",
-    glow: true
-  }
-
-];
+  <strong id="status">● Waiting for video</strong>
+</section>
 
 
-// -------------------------
-// RENDER PRESETS
-// -------------------------
+<!-- YOUTUBE -->
+<section class="youtube-box">
 
-function renderStyles() {
+  <h3>🎬 YouTube Video</h3>
 
-  if (!stylesGrid) return;
+  <p>
+    Paste your YouTube video link and let AI find the strongest short-form moments.
+  </p>
 
-  stylesGrid.innerHTML = "";
+  <div class="youtube-row">
 
-  if (presetCount) {
-    presetCount.textContent = `${styles.length} presets`;
-  }
+    <input
+      id="youtubeUrl"
+      type="url"
+      placeholder="https://www.youtube.com/watch?v=..."
+      autocomplete="off"
+    >
 
-  styles.forEach((style, index) => {
+    <button
+      id="analyzeYoutube"
+      class="primary"
+    >
+      ✨ Find 5 Best Clips
+    </button>
 
-    const card = document.createElement("button");
+  </div>
 
-    card.type = "button";
-    card.className = "style-card";
+  <div class="processing" id="youtubeProcessing">
 
-    card.innerHTML = `
-      <div
-        class="style-preview"
-        style="
-          color:${style.color};
-          text-shadow:${style.glow ? `0 0 18px ${style.color}` : "none"};
-        "
+    <div class="progress">
+      <i id="youtubeProgress"></i>
+    </div>
+
+    <small id="youtubeProgressText">
+      Preparing video analysis...
+    </small>
+
+  </div>
+
+</section>
+
+
+<!-- AI CLIPS -->
+<section class="panel clips-section">
+
+  <div class="head">
+
+    <b>🔥 AI Best Shorts</b>
+
+    <small id="clipsCount">
+      0 clips
+    </small>
+
+  </div>
+
+  <div
+    id="clipsGrid"
+    class="clips-grid"
+  >
+
+    <div class="clip-card">
+      <div class="clip-thumb">🎬</div>
+      <b>Clip 1</b>
+      <small>Waiting for analysis</small>
+    </div>
+
+    <div class="clip-card">
+      <div class="clip-thumb">🎬</div>
+      <b>Clip 2</b>
+      <small>Waiting for analysis</small>
+    </div>
+
+    <div class="clip-card">
+      <div class="clip-thumb">🎬</div>
+      <b>Clip 3</b>
+      <small>Waiting for analysis</small>
+    </div>
+
+    <div class="clip-card">
+      <div class="clip-thumb">🎬</div>
+      <b>Clip 4</b>
+      <small>Waiting for analysis</small>
+    </div>
+
+    <div class="clip-card">
+      <div class="clip-thumb">🎬</div>
+      <b>Clip 5</b>
+      <small>Waiting for analysis</small>
+    </div>
+
+  </div>
+
+</section>
+
+
+<!-- WORKSPACE -->
+<section class="workspace">
+
+  <aside class="panel">
+
+    <div
+      class="upload"
+      id="dropZone"
+    >
+
+      <input
+        id="videoInput"
+        type="file"
+        accept="video/*"
+        hidden
       >
-        Aa
-      </div>
 
-      <b>${style.name}</b>
-      <small>${style.effect}</small>
-    `;
+      <b>↑ Drop video here</b>
 
-    card.addEventListener("click", () => {
+      <span>
+        or choose a video
+      </span>
 
-      selectedStyle = style;
+      <button
+        id="chooseVideo"
+        class="primary"
+      >
+        Choose Video
+      </button>
 
-      document
-        .querySelectorAll(".style-card")
-        .forEach(el => el.classList.remove("active"));
+    </div>
 
-      card.classList.add("active");
 
-      renderCaption();
+    <hr>
 
-    });
+    <b>Caption AI</b>
 
-    stylesGrid.appendChild(card);
+    <label>
+      Language
 
-    if (index === 0) {
-      card.classList.add("active");
-    }
+      <select id="language">
 
-  });
+        <option value="auto">
+          Auto detect
+        </option>
 
-}
+        <option value="en">
+          English
+        </option>
 
+        <option value="hi">
+          Hindi
+        </option>
 
-// -------------------------
-// YOUTUBE ID
-// -------------------------
+      </select>
 
-function getYouTubeId(url) {
+    </label>
 
-  try {
 
-    const parsed = new URL(url);
+    <button
+      id="generateCaptions"
+      class="primary"
+    >
+      ✨ Generate Auto Captions
+    </button>
 
-    if (parsed.hostname.includes("youtu.be")) {
-      return parsed.pathname.substring(1);
-    }
 
-    if (
-      parsed.hostname.includes("youtube.com") &&
-      parsed.searchParams.get("v")
-    ) {
-      return parsed.searchParams.get("v");
-    }
+    <div class="progress">
+      <i id="progressBar"></i>
+    </div>
 
-    if (
-      parsed.hostname.includes("youtube.com") &&
-      parsed.pathname.startsWith("/shorts/")
-    ) {
-      return parsed.pathname.split("/shorts/")[1].split("/")[0];
-    }
+    <small id="progressText">
+      Nothing processed yet.
+    </small>
 
-    return null;
 
-  } catch {
+    <hr>
 
-    return null;
+    <b>Short Settings</b>
 
-  }
 
-}
+    <label>
+      Aspect Ratio
 
+      <select id="aspectRatio">
 
-// -------------------------
-// ANALYZE YOUTUBE
-// -------------------------
+        <option value="9:16">
+          9:16 — Shorts
+        </option>
 
-if (analyzeYoutube) {
+        <option value="1:1">
+          1:1 — Square
+        </option>
 
-  analyzeYoutube.addEventListener("click", async () => {
+        <option value="16:9">
+          16:9 — YouTube
+        </option>
 
-    const url = youtubeUrl.value.trim();
+      </select>
 
-    if (!url) {
+    </label>
 
-      setStatus("⚠️ Paste a YouTube URL first");
 
-      youtubeUrl.focus();
+    <label>
+      Words
 
-      return;
-    }
+      <input
+        id="wordsPerCaption"
+        type="range"
+        min="2"
+        max="8"
+        value="4"
+      >
 
-    const videoId = getYouTubeId(url);
+      <span id="wordCount">
+        4
+      </span>
 
-    if (!videoId) {
+    </label>
 
-      setStatus("⚠️ Invalid YouTube URL");
 
-      return;
-    }
+    <label>
+      Size
 
-    startYouTubeProcessing();
+      <input
+        id="fontSize"
+        type="range"
+        min="22"
+        max="90"
+        value="48"
+      >
 
-    /*
-      IMPORTANT:
+      <span id="fontSizeValue">
+        48
+      </span>
 
-      This frontend currently creates the 5 result cards.
+    </label>
 
-      The actual authorized video download/processing,
-      AI highlight detection and MP4 generation will be
-      connected to the backend in the next step.
-    */
 
-    const clips = await simulateAnalysis();
+    <label>
+      Position
 
-    showClips(clips);
+      <select id="captionPosition">
 
-    finishYouTubeProcessing();
+        <option value="bottom">
+          Bottom
+        </option>
 
-  });
+        <option value="center">
+          Center
+        </option>
 
-}
+        <option value="top">
+          Top
+        </option>
 
+      </select>
 
-// -------------------------
-// PROCESSING UI
-// -------------------------
+    </label>
 
-function startYouTubeProcessing() {
+  </aside>
 
-  youtubeProcessing?.classList.add("active");
 
-  analyzeYoutube.disabled = true;
+  <!-- PREVIEW -->
+  <section class="panel preview">
 
-  youtubeProgress.style.width = "5%";
+    <div id="videoStage">
 
-  youtubeProgressText.textContent =
-    "Analyzing video...";
+      <video
+        id="video"
+        playsinline
+        controls
+      ></video>
 
-  setStatus("● AI analyzing video");
+      <div id="captionOverlay"></div>
 
-}
+      <span id="emptyState">
+        Select a clip to preview
+      </span>
 
+    </div>
 
-function finishYouTubeProcessing() {
 
-  youtubeProgress.style.width = "100%";
+    <div class="timeline">
 
-  youtubeProgressText.textContent =
-    "5 best clips found.";
+      <button id="playBtn">
+        ▶
+      </button>
 
-  analyzeYoutube.disabled = false;
+      <span id="currentTime">
+        00:00.0
+      </span>
 
-  setStatus("● 5 Shorts ready");
+      <input
+        id="seek"
+        type="range"
+        min="0"
+        max="1000"
+        value="0"
+      >
 
-}
+      <span id="duration">
+        00:00.0
+      </span>
 
+    </div>
 
-// -------------------------
-// DEMO AI ANALYSIS
-// -------------------------
+  </section>
 
-function simulateAnalysis() {
 
-  return new Promise(resolve => {
+  <!-- PRESETS -->
+  <aside class="panel">
 
-    let progress = 5;
+    <div class="head">
 
-    const timer = setInterval(() => {
+      <b>Caption Presets</b>
 
-      progress += Math.floor(Math.random() * 15) + 5;
+      <small id="presetCount"></small>
 
-      if (progress >= 100) {
+    </div>
 
-        progress = 100;
+    <div id="stylesGrid"></div>
 
-        clearInterval(timer);
+  </aside>
 
-        resolve([
+</section>
 
-          {
-            id: 1,
-            title: "Best Moment #1",
-            score: 98,
-            duration: "00:32",
-            start: 0
-          },
 
-          {
-            id: 2,
-            title: "Best Moment #2",
-            score: 95,
-            duration: "00:41",
-            start: 0
-          },
+<!-- CAPTION TIMELINE -->
+<section class="panel list">
 
-          {
-            id: 3,
-            title: "Best Moment #3",
-            score: 93,
-            duration: "00:28",
-            start: 0
-          },
+  <div class="head">
 
-          {
-            id: 4,
-            title: "Best Moment #4",
-            score: 91,
-            duration: "00:36",
-            start: 0
-          },
+    <b>Caption Timeline</b>
 
-          {
-            id: 5,
-            title: "Best Moment #5",
-            score: 89,
-            duration: "00:45",
-            start: 0
-          }
+    <div>
 
-        ]);
+      <button id="downloadSrt">
+        SRT
+      </button>
 
-      }
+      <button id="downloadJson">
+        JSON
+      </button>
 
-      youtubeProgress.style.width = `${progress}%`;
+    </div>
 
-      youtubeProgressText.textContent =
-        `Finding strongest moments... ${progress}%`;
+  </div>
 
-    }, 350);
 
-  });
+  <div id="captionsTrack">
 
-}
+    <p>
+      Generate captions to see the timeline.
+    </p>
 
+  </div>
 
-// -------------------------
-// SHOW CLIPS
-// -------------------------
+</section>
 
-function showClips(clips) {
+</main>
 
-  clipsGrid.innerHTML = "";
 
-  clipsCount.textContent =
-    `${clips.length} clips`;
+<script type="module" src="app.js"></script>
 
-  clips.forEach((clip, index) => {
-
-    const card = document.createElement("div");
-
-    card.className = "clip-card";
-
-    card.innerHTML = `
-
-      <div class="clip-thumb">
-
-        <span>▶</span>
-
-      </div>
-
-      <b>
-        ${clip.title}
-      </b>
-
-      <small>
-        ${clip.duration}
-      </small>
-
-      <div class="score">
-        🔥 ${clip.score}% viral score
-      </div>
-
-    `;
-
-    card.addEventListener("click", () => {
-
-      document
-        .querySelectorAll(".clip-card")
-        .forEach(el =>
-          el.classList.remove("selected")
-        );
-
-      card.classList.add("selected");
-
-      selectedClip = clip;
-
-      setStatus(
-        `● Clip ${index + 1} selected`
-      );
-
-      /*
-        Backend-generated clip URL will be
-        connected here later.
-      */
-
-    });
-
-    clipsGrid.appendChild(card);
-
-  });
-
-}
-
-
-// -------------------------
-// VIDEO UPLOAD
-// -------------------------
-
-function openVideoPicker() {
-
-  videoInput?.click();
-
-}
-
-chooseVideo?.addEventListener(
-  "click",
-  openVideoPicker
-);
-
-uploadTop?.addEventListener(
-  "click",
-  openVideoPicker
-);
-
-
-videoInput?.addEventListener(
-  "change",
-  () => {
-
-    const file = videoInput.files?.[0];
-
-    if (!file) return;
-
-    loadVideoFile(file);
-
-  }
-);
-
-
-// -------------------------
-// LOAD LOCAL VIDEO
-// -------------------------
-
-function loadVideoFile(file) {
-
-  const url = URL.createObjectURL(file);
-
-  video.src = url;
-
-  video.load();
-
-  emptyState.style.display = "none";
-
-  setStatus(
-    `● ${file.name}`
-  );
-
-}
-
-
-// -------------------------
-// DRAG & DROP
-// -------------------------
-
-dropZone?.addEventListener(
-  "dragover",
-  event => {
-
-    event.preventDefault();
-
-    dropZone.classList.add("dragging");
-
-  }
-);
-
-
-dropZone?.addEventListener(
-  "dragleave",
-  () => {
-
-    dropZone.classList.remove(
-      "dragging"
-    );
-
-  }
-);
-
-
-dropZone?.addEventListener(
-  "drop",
-  event => {
-
-    event.preventDefault();
-
-    dropZone.classList.remove(
-      "dragging"
-    );
-
-    const file =
-      event.dataTransfer.files?.[0];
-
-    if (
-      file &&
-      file.type.startsWith("video/")
-    ) {
-
-      loadVideoFile(file);
-
-    }
-
-  }
-);
-
-
-// -------------------------
-// STATUS
-// -------------------------
-
-function setStatus(text) {
-
-  if (status) {
-    status.textContent = text;
-  }
-
-}
-
-
-// -------------------------
-// VIDEO CONTROLS
-// -------------------------
-
-playBtn?.addEventListener(
-  "click",
-  () => {
-
-    if (video.paused) {
-
-      video.play();
-
-      playBtn.textContent = "❚❚";
-
-    } else {
-
-      video.pause();
-
-      playBtn.textContent = "▶";
-
-    }
-
-  }
-);
-
-
-video?.addEventListener(
-  "loadedmetadata",
-  () => {
-
-    duration.textContent =
-      formatTime(video.duration);
-
-  }
-);
-
-
-video?.addEventListener(
-  "timeupdate",
-  () => {
-
-    if (!video.duration) return;
-
-    const value =
-      (video.currentTime / video.duration) * 1000;
-
-    seek.value = value;
-
-    currentTime.textContent =
-      formatTime(video.currentTime);
-
-  }
-);
-
-
-seek?.addEventListener(
-  "input",
-  () => {
-
-    if (!video.duration) return;
-
-    video.currentTime =
-      (Number(seek.value) / 1000) *
-      video.duration;
-
-  }
-);
-
-
-function formatTime(seconds) {
-
-  if (!Number.isFinite(seconds)) {
-    return "00:00.0";
-  }
-
-  const minutes =
-    Math.floor(seconds / 60);
-
-  const secs =
-    Math.floor(seconds % 60);
-
-  const ms =
-    Math.floor((seconds % 1) * 10);
-
-  return `${String(minutes).padStart(2,"0")}:${String(secs).padStart(2,"0")}.${ms}`;
-
-}
-
-
-// -------------------------
-// CAPTION SETTINGS
-// -------------------------
-
-wordsPerCaption?.addEventListener(
-  "input",
-  () => {
-
-    wordCount.textContent =
-      wordsPerCaption.value;
-
-  }
-);
-
-
-fontSize?.addEventListener(
-  "input",
-  () => {
-
-    fontSizeValue.textContent =
-      fontSize.value;
-
-    renderCaption();
-
-  }
-);
-
-
-captionPosition?.addEventListener(
-  "change",
-  renderCaption
-);
-
-
-aspectRatio?.addEventListener(
-  "change",
-  () => {
-
-    if (!videoStage) return;
-
-    videoStage.dataset.ratio =
-      aspectRatio.value;
-
-  }
-);
-
-
-// -------------------------
-// CAPTION GENERATION
-// -------------------------
-
-generateCaptions?.addEventListener(
-  "click",
-  async () => {
-
-    if (!video.src) {
-
-      setStatus(
-        "⚠️ Upload/select a video first"
-      );
-
-      return;
-
-    }
-
-    generateCaptions.disabled = true;
-
-    setStatus(
-      "● Generating captions..."
-    );
-
-    await new Promise(
-      resolve => setTimeout(resolve, 1200)
-    );
-
-    captions = [
-
-      {
-        start: 0,
-        end: 3,
-        text: "This is your AI generated caption"
-      },
-
-      {
-        start: 3,
-        end: 6,
-        text: "With viral style animation"
-      }
-
-    ];
-
-    renderCaption();
-
-    setStatus(
-      "● Captions ready"
-    );
-
-    generateCaptions.disabled = false;
-
-  }
-);
-
-
-// -------------------------
-// RENDER CAPTION
-// -------------------------
-
-function renderCaption() {
-
-  if (!captionOverlay) return;
-
-  if (!captions.length) {
-
-    captionOverlay.textContent =
-      "Your captions will appear here";
-
-    return;
-
-  }
-
-  const current =
-    video.currentTime || 0;
-
-  const active =
-    captions.find(
-      caption =>
-        current >= caption.start &&
-        current <= caption.end
-    );
-
-  if (!active) {
-
-    captionOverlay.textContent = "";
-
-    return;
-
-  }
-
-  captionOverlay.textContent =
-    active.text;
-
-  captionOverlay.style.fontSize =
-    `${fontSize.value}px`;
-
-  captionOverlay.style.color =
-    selectedStyle.color;
-
-  captionOverlay.dataset.effect =
-    selectedStyle.effect;
-
-  captionOverlay.dataset.position =
-    captionPosition.value;
-
-}
-
-
-// -------------------------
-// CAPTION UPDATE
-// -------------------------
-
-video?.addEventListener(
-  "timeupdate",
-  renderCaption
-);
-
-
-// -------------------------
-// INITIALIZE
-// -------------------------
-
-renderStyles();
-
-console.log(
-  "GLOWING AI Shorts Studio loaded."
-);
+</body>
+</html>
