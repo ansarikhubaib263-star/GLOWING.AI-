@@ -1,11 +1,22 @@
+// ======================================================
 // GLOWING AI — AI SHORTS FRONTEND
-// Step 2: YouTube URL + 5 Best Clips UI + Caption Presets
+// YouTube URL + AI Clips + Caption Presets
+// ======================================================
 
 const $ = (id) => document.getElementById(id);
 
-// -------------------------
+
+// ======================================================
+// BACKEND
+// ======================================================
+
+const BACKEND_URL =
+  "https://glowing-ai-backend.onrender.com";
+
+
+// ======================================================
 // ELEMENTS
-// -------------------------
+// ======================================================
 
 const youtubeUrl = $("youtubeUrl");
 const analyzeYoutube = $("analyzeYoutube");
@@ -47,9 +58,9 @@ const currentTime = $("currentTime");
 const duration = $("duration");
 
 
-// -------------------------
+// ======================================================
 // STATE
-// -------------------------
+// ======================================================
 
 let selectedClip = null;
 let captions = [];
@@ -62,9 +73,9 @@ let selectedStyle = {
 };
 
 
-// -------------------------
+// ======================================================
 // CAPTION PRESETS
-// -------------------------
+// ======================================================
 
 const styles = [
 
@@ -127,9 +138,9 @@ const styles = [
 ];
 
 
-// -------------------------
+// ======================================================
 // RENDER PRESETS
-// -------------------------
+// ======================================================
 
 function renderStyles() {
 
@@ -138,22 +149,30 @@ function renderStyles() {
   stylesGrid.innerHTML = "";
 
   if (presetCount) {
-    presetCount.textContent = `${styles.length} presets`;
+    presetCount.textContent =
+      `${styles.length} presets`;
   }
 
   styles.forEach((style, index) => {
 
-    const card = document.createElement("button");
+    const card =
+      document.createElement("button");
 
     card.type = "button";
-    card.className = "style-card";
+
+    card.className =
+      "style-card";
 
     card.innerHTML = `
       <div
         class="style-preview"
         style="
           color:${style.color};
-          text-shadow:${style.glow ? `0 0 18px ${style.color}` : "none"};
+          text-shadow:${
+            style.glow
+              ? `0 0 18px ${style.color}`
+              : "none"
+          };
         "
       >
         Aa
@@ -163,19 +182,24 @@ function renderStyles() {
       <small>${style.effect}</small>
     `;
 
-    card.addEventListener("click", () => {
+    card.addEventListener(
+      "click",
+      () => {
 
-      selectedStyle = style;
+        selectedStyle = style;
 
-      document
-        .querySelectorAll(".style-card")
-        .forEach(el => el.classList.remove("active"));
+        document
+          .querySelectorAll(".style-card")
+          .forEach(el =>
+            el.classList.remove("active")
+          );
 
-      card.classList.add("active");
+        card.classList.add("active");
 
-      renderCaption();
+        renderCaption();
 
-    });
+      }
+    );
 
     stylesGrid.appendChild(card);
 
@@ -188,32 +212,54 @@ function renderStyles() {
 }
 
 
-// -------------------------
+// ======================================================
 // YOUTUBE ID
-// -------------------------
+// ======================================================
 
 function getYouTubeId(url) {
 
   try {
 
-    const parsed = new URL(url);
+    const parsed =
+      new URL(url);
 
-    if (parsed.hostname.includes("youtu.be")) {
-      return parsed.pathname.substring(1);
+    if (
+      parsed.hostname.includes(
+        "youtu.be"
+      )
+    ) {
+
+      return parsed.pathname
+        .substring(1)
+        .split("/")[0];
+
     }
 
     if (
-      parsed.hostname.includes("youtube.com") &&
+      parsed.hostname.includes(
+        "youtube.com"
+      ) &&
       parsed.searchParams.get("v")
     ) {
-      return parsed.searchParams.get("v");
+
+      return parsed.searchParams
+        .get("v");
+
     }
 
     if (
-      parsed.hostname.includes("youtube.com") &&
-      parsed.pathname.startsWith("/shorts/")
+      parsed.hostname.includes(
+        "youtube.com"
+      ) &&
+      parsed.pathname.startsWith(
+        "/shorts/"
+      )
     ) {
-      return parsed.pathname.split("/shorts/")[1].split("/")[0];
+
+      return parsed.pathname
+        .split("/shorts/")[1]
+        .split("/")[0];
+
     }
 
     return null;
@@ -227,544 +273,211 @@ function getYouTubeId(url) {
 }
 
 
-// -------------------------
+// ======================================================
 // ANALYZE YOUTUBE
-// -------------------------
+// ======================================================
 
 if (analyzeYoutube) {
 
-  analyzeYoutube.addEventListener("click", async () => {
+  analyzeYoutube.addEventListener(
+    "click",
+    async () => {
 
-    const url = youtubeUrl.value.trim();
+      const url =
+        youtubeUrl?.value.trim();
 
-    if (!url) {
+      if (!url) {
 
-      setStatus("⚠️ Paste a YouTube URL first");
-
-      youtubeUrl.focus();
-
-      return;
-    }
-
-    const videoId = getYouTubeId(url);
-
-    if (!videoId) {
-
-      setStatus("⚠️ Invalid YouTube URL");
-
-      return;
-    }
-
-    startYouTubeProcessing();
-
-    /*
-      IMPORTANT:
-
-      This frontend currently creates the 5 result cards.
-
-      The actual authorized video download/processing,
-      AI highlight detection and MP4 generation will be
-      connected to the backend in the next step.
-    */
-
-    const clips = await simulateAnalysis();
-
-    showClips(clips);
-
-    finishYouTubeProcessing();
-
-  });
-
-}
-
-
-// -------------------------
-// PROCESSING UI
-// -------------------------
-
-function startYouTubeProcessing() {
-
-  youtubeProcessing?.classList.add("active");
-
-  analyzeYoutube.disabled = true;
-
-  youtubeProgress.style.width = "5%";
-
-  youtubeProgressText.textContent =
-    "Analyzing video...";
-
-  setStatus("● AI analyzing video");
-
-}
-
-
-function finishYouTubeProcessing() {
-
-  youtubeProgress.style.width = "100%";
-
-  youtubeProgressText.textContent =
-    "5 best clips found.";
-
-  analyzeYoutube.disabled = false;
-
-  setStatus("● 5 Shorts ready");
-
-}
-
-
-// -------------------------
-// SHOW CLIPS
-// -------------------------
-
-function showClips(clips) {
-
-  clipsGrid.innerHTML = "";
-
-  clipsCount.textContent =
-    `${clips.length} clips`;
-
-  clips.forEach((clip, index) => {
-
-    const card = document.createElement("div");
-
-    card.className = "clip-card";
-
-    card.innerHTML = `
-
-      <div class="clip-thumb">
-
-        <span>▶</span>
-
-      </div>
-
-      <b>
-        ${clip.title}
-      </b>
-
-      <small>
-        ${clip.duration}
-      </small>
-
-      <div class="score">
-        🔥 ${clip.score}% viral score
-      </div>
-
-    `;
-
-    card.addEventListener("click", () => {
-
-      document
-        .querySelectorAll(".clip-card")
-        .forEach(el =>
-          el.classList.remove("selected")
+        setStatus(
+          "⚠️ Paste a YouTube URL first"
         );
 
-      card.classList.add("selected");
+        youtubeUrl?.focus();
 
-      selectedClip = clip;
+        return;
+
+      }
+
+      const videoId =
+        getYouTubeId(url);
+
+      if (!videoId) {
+
+        setStatus(
+          "⚠️ Invalid YouTube URL"
+        );
+
+        return;
+
+      }
+
+      analyzeYoutube.disabled =
+        true;
+
+      youtubeProcessing?.classList
+        .add("active");
+
+      if (youtubeProgress) {
+        youtubeProgress.style.width =
+          "10%";
+      }
+
+      if (youtubeProgressText) {
+        youtubeProgressText.textContent =
+          "Preparing AI analysis...";
+      }
 
       setStatus(
-        `● Clip ${index + 1} selected`
+        "● AI analyzing YouTube video..."
       );
 
-      /*
-        Backend-generated clip URL will be
-        connected here later.
-      */
+      try {
 
-    });
+        if (youtubeProgress) {
+          youtubeProgress.style.width =
+            "30%";
+        }
 
-    clipsGrid.appendChild(card);
+        if (youtubeProgressText) {
+          youtubeProgressText.textContent =
+            "Sending video to AI...";
+        }
 
-  });
+        /*
+         * Backend endpoint:
+         *
+         * POST /api/find-clips
+         *
+         * IMPORTANT:
+         * Current backend expects a FILE upload.
+         * YouTube URL downloading must be supported
+         * by the backend before this can work.
+         */
 
-}
+        const response =
+          await fetch(
+            `${BACKEND_URL}/api/find-clips`,
+            {
+              method: "POST",
 
+              headers: {
+                "Content-Type":
+                  "application/json"
+              },
 
-// -------------------------
-// VIDEO UPLOAD
-// -------------------------
+              body: JSON.stringify({
+                youtubeUrl: url
+              })
+            }
+          );
 
-function openVideoPicker() {
+        if (youtubeProgress) {
+          youtubeProgress.style.width =
+            "70%";
+        }
 
-  videoInput?.click();
+        if (youtubeProgressText) {
+          youtubeProgressText.textContent =
+            "Finding best moments...";
+        }
 
-}
+        const data =
+          await response.json();
 
-chooseVideo?.addEventListener(
-  "click",
-  openVideoPicker
-);
+        if (
+          !response.ok ||
+          !data.ok
+        ) {
 
-uploadTop?.addEventListener(
-  "click",
-  openVideoPicker
-);
+          throw new Error(
+            data.error ||
+            "Clip analysis failed"
+          );
 
+        }
 
-videoInput?.addEventListener(
-  "change",
-  () => {
+        if (
+          !Array.isArray(
+            data.clips
+          ) ||
+          !data.clips.length
+        ) {
 
-    const file = videoInput.files?.[0];
+          throw new Error(
+            "No clips were found."
+          );
 
-    if (!file) return;
+        }
 
-    loadVideoFile(file);
+        if (youtubeProgress) {
+          youtubeProgress.style.width =
+            "100%";
+        }
 
-  }
-);
+        if (youtubeProgressText) {
+          youtubeProgressText.textContent =
+            `${data.clips.length} best clips found.`;
+        }
 
+        showClips(
+          data.clips
+        );
 
-// -------------------------
-// LOAD LOCAL VIDEO
-// -------------------------
+        setStatus(
+          `● ${data.clips.length} Shorts ready`
+        );
 
-function loadVideoFile(file) {
+      } catch (error) {
 
-  const url = URL.createObjectURL(file);
+        console.error(
+          "YouTube analysis error:",
+          error
+        );
 
-  video.src = url;
+        if (youtubeProgress) {
+          youtubeProgress.style.width =
+            "0%";
+        }
 
-  video.load();
+        if (youtubeProgressText) {
+          youtubeProgressText.textContent =
+            "Analysis failed";
+        }
 
-  emptyState.style.display = "none";
+        setStatus(
+          "❌ " +
+          (
+            error?.message ||
+            "Clip generation failed"
+          )
+        );
 
-  setStatus(
-    `● ${file.name}`
+      } finally {
+
+        analyzeYoutube.disabled =
+          false;
+
+      }
+
+    }
   );
 
 }
 
 
-// -------------------------
-// DRAG & DROP
-// -------------------------
+// ======================================================
+// SHOW CLIPS
+// ======================================================
 
-dropZone?.addEventListener(
-  "dragover",
-  event => {
+function showClips(clips) {
 
-    event.preventDefault();
+  if (!clipsGrid) return;
 
-    dropZone.classList.add("dragging");
+  clipsGrid.innerHTML = "";
 
-  }
-);
-
-
-dropZone?.addEventListener(
-  "dragleave",
-  () => {
-
-    dropZone.classList.remove(
-      "dragging"
-    );
-
-  }
-);
-
-
-dropZone?.addEventListener(
-  "drop",
-  event => {
-
-    event.preventDefault();
-
-    dropZone.classList.remove(
-      "dragging"
-    );
-
-    const file =
-      event.dataTransfer.files?.[0];
-
-    if (
-      file &&
-      file.type.startsWith("video/")
-    ) {
-
-      loadVideoFile(file);
-
-    }
-
-  }
-);
-
-
-// -------------------------
-// STATUS
-// -------------------------
-
-function setStatus(text) {
-
-  if (status) {
-    status.textContent = text;
+  if (clipsCount) {
+    clipsCount.textContent =
+      `${clips.length} clips`;
   }
 
-}
-
-
-// -------------------------
-// VIDEO CONTROLS
-// -------------------------
-
-playBtn?.addEventListener(
-  "click",
-  () => {
-
-    if (video.paused) {
-
-      video.play();
-
-      playBtn.textContent = "❚❚";
-
-    } else {
-
-      video.pause();
-
-      playBtn.textContent = "▶";
-
-    }
-
-  }
-);
-
-
-video?.addEventListener(
-  "loadedmetadata",
-  () => {
-
-    duration.textContent =
-      formatTime(video.duration);
-
-  }
-);
-
-
-video?.addEventListener(
-  "timeupdate",
-  () => {
-
-    if (!video.duration) return;
-
-    const value =
-      (video.currentTime / video.duration) * 1000;
-
-    seek.value = value;
-
-    currentTime.textContent =
-      formatTime(video.currentTime);
-
-  }
-);
-
-
-seek?.addEventListener(
-  "input",
-  () => {
-
-    if (!video.duration) return;
-
-    video.currentTime =
-      (Number(seek.value) / 1000) *
-      video.duration;
-
-  }
-);
-
-
-function formatTime(seconds) {
-
-  if (!Number.isFinite(seconds)) {
-    return "00:00.0";
-  }
-
-  const minutes =
-    Math.floor(seconds / 60);
-
-  const secs =
-    Math.floor(seconds % 60);
-
-  const ms =
-    Math.floor((seconds % 1) * 10);
-
-  return `${String(minutes).padStart(2,"0")}:${String(secs).padStart(2,"0")}.${ms}`;
-
-}
-
-
-// -------------------------
-// CAPTION SETTINGS
-// -------------------------
-
-wordsPerCaption?.addEventListener(
-  "input",
-  () => {
-
-    wordCount.textContent =
-      wordsPerCaption.value;
-
-  }
-);
-
-
-fontSize?.addEventListener(
-  "input",
-  () => {
-
-    fontSizeValue.textContent =
-      fontSize.value;
-
-    renderCaption();
-
-  }
-);
-
-
-captionPosition?.addEventListener(
-  "change",
-  renderCaption
-);
-
-
-aspectRatio?.addEventListener(
-  "change",
-  () => {
-
-    if (!videoStage) return;
-
-    videoStage.dataset.ratio =
-      aspectRatio.value;
-
-  }
-);
-
-
-// -------------------------
-// CAPTION GENERATION
-// -------------------------
-
-generateCaptions?.addEventListener(
-  "click",
-  async () => {
-
-    if (!video.src) {
-
-      setStatus(
-        "⚠️ Upload/select a video first"
-      );
-
-      return;
-
-    }
-
-    generateCaptions.disabled = true;
-
-    setStatus(
-      "● Generating captions..."
-    );
-
-    await new Promise(
-      resolve => setTimeout(resolve, 1200)
-    );
-
-    captions = [
-
-      {
-        start: 0,
-        end: 3,
-        text: "This is your AI generated caption"
-      },
-
-      {
-        start: 3,
-        end: 6,
-        text: "With viral style animation"
-      }
-
-    ];
-
-    renderCaption();
-
-    setStatus(
-      "● Captions ready"
-    );
-
-    generateCaptions.disabled = false;
-
-  }
-);
-
-
-// -------------------------
-// RENDER CAPTION
-// -------------------------
-
-function renderCaption() {
-
-  if (!captionOverlay) return;
-
-  if (!captions.length) {
-
-    captionOverlay.textContent =
-      "Your captions will appear here";
-
-    return;
-
-  }
-
-  const current =
-    video.currentTime || 0;
-
-  const active =
-    captions.find(
-      caption =>
-        current >= caption.start &&
-        current <= caption.end
-    );
-
-  if (!active) {
-
-    captionOverlay.textContent = "";
-
-    return;
-
-  }
-
-  captionOverlay.textContent =
-    active.text;
-
-  captionOverlay.style.fontSize =
-    `${fontSize.value}px`;
-
-  captionOverlay.style.color =
-    selectedStyle.color;
-
-  captionOverlay.dataset.effect =
-    selectedStyle.effect;
-
-  captionOverlay.dataset.position =
-    captionPosition.value;
-
-}
-
-
-// -------------------------
-// CAPTION UPDATE
-// -------------------------
-
-video?.addEventListener(
-  "timeupdate",
-  renderCaption
-);
-
-
-// -------------------------
-// INITIALIZE
-// -------------------------
-
-renderStyles();
-
-console.log(
-  "GLOWING AI Shorts Studio loaded."
-);
+  clips
