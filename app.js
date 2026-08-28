@@ -274,7 +274,7 @@ function getYouTubeId(url) {
 
 
 // ======================================================
-// ANALYZE YOUTUBE
+// ANALYZE VIDEO — REAL AI CLIP GENERATION
 // ======================================================
 
 if (analyzeYoutube) {
@@ -283,106 +283,110 @@ if (analyzeYoutube) {
     "click",
     async () => {
 
-      const url =
-        youtubeUrl?.value.trim();
+      const file =
+        videoInput?.files?.[0];
 
-      if (!url) {
+      // ----------------------------------------
+      // CHECK VIDEO
+      // ----------------------------------------
+
+      if (!file) {
 
         setStatus(
-          "⚠️ Paste a YouTube URL first"
+          "⚠️ Pehle video upload karo"
         );
 
-        youtubeUrl?.focus();
-
-        return;
-
-      }
-
-      const videoId =
-        getYouTubeId(url);
-
-      if (!videoId) {
-
-        setStatus(
-          "⚠️ Invalid YouTube URL"
+        alert(
+          "Pehle video upload karo, phir Analyze AI dabao."
         );
 
         return;
-
       }
 
-      analyzeYoutube.disabled =
-        true;
 
-      youtubeProcessing?.classList
-        .add("active");
+      // ----------------------------------------
+      // START
+      // ----------------------------------------
+
+      analyzeYoutube.disabled = true;
+
+      youtubeProcessing?.classList.add(
+        "active"
+      );
 
       if (youtubeProgress) {
         youtubeProgress.style.width =
-          "10%";
+          "5%";
       }
 
       if (youtubeProgressText) {
         youtubeProgressText.textContent =
-          "Preparing AI analysis...";
+          "Uploading video...";
       }
 
       setStatus(
-        "● AI analyzing YouTube video..."
+        "● Video AI backend ko bheja ja raha hai..."
       );
+
 
       try {
 
+        // --------------------------------------
+        // FORM DATA
+        // --------------------------------------
+
+        const formData =
+          new FormData();
+
+        formData.append(
+          "file",
+          file
+        );
+
+
         if (youtubeProgress) {
           youtubeProgress.style.width =
-            "30%";
+            "25%";
         }
 
         if (youtubeProgressText) {
           youtubeProgressText.textContent =
-            "Sending video to AI...";
+            "AI is transcribing your video...";
         }
 
-        /*
-         * Backend endpoint:
-         *
-         * POST /api/find-clips
-         *
-         * IMPORTANT:
-         * Current backend expects a FILE upload.
-         * YouTube URL downloading must be supported
-         * by the backend before this can work.
-         */
+
+        // --------------------------------------
+        // SEND TO RENDER BACKEND
+        // --------------------------------------
 
         const response =
           await fetch(
             `${BACKEND_URL}/api/find-clips`,
             {
               method: "POST",
-
-              headers: {
-                "Content-Type":
-                  "application/json"
-              },
-
-              body: JSON.stringify({
-                youtubeUrl: url
-              })
+              body: formData
             }
           );
 
+
         if (youtubeProgress) {
           youtubeProgress.style.width =
-            "70%";
+            "60%";
         }
 
         if (youtubeProgressText) {
           youtubeProgressText.textContent =
-            "Finding best moments...";
+            "AI is finding the best moments...";
         }
+
+
+        // --------------------------------------
+        // READ RESPONSE
+        // --------------------------------------
 
         const data =
           await response.json();
+
 
         if (
           !response.ok ||
@@ -391,23 +395,68 @@ if (analyzeYoutube) {
 
           throw new Error(
             data.error ||
-            "Clip analysis failed"
+            "Clip generation failed"
           );
 
         }
 
+
+        // --------------------------------------
+        // CHECK CLIPS
+        // --------------------------------------
+
         if (
-          !Array.isArray(
-            data.clips
-          ) ||
+          !Array.isArray(data.clips) ||
           !data.clips.length
         ) {
 
           throw new Error(
-            "No clips were found."
+            "AI could not find suitable clips."
           );
 
         }
+
+
+        // --------------------------------------
+        // CONVERT CLIP URL
+        // --------------------------------------
+
+        const clips =
+          data.clips.map(
+            (clip, index) => {
+
+              return {
+
+                ...clip,
+
+                id:
+                  clip.id ||
+                  index + 1,
+
+                title:
+                  `AI Best Moment #${index + 1}`,
+
+                duration:
+                  formatTime(
+                    Number(
+                      clip.duration || 0
+                    )
+                  ),
+
+                videoUrl:
+                  clip.url
+                    ? `${BACKEND_URL}${clip.url}`
+                    : null
+
+              };
+
+            }
+          );
+
+
+        // --------------------------------------
+        // COMPLETE
+        // --------------------------------------
 
         if (youtubeProgress) {
           youtubeProgress.style.width =
@@ -416,23 +465,25 @@ if (analyzeYoutube) {
 
         if (youtubeProgressText) {
           youtubeProgressText.textContent =
-            `${data.clips.length} best clips found.`;
+            `${clips.length} best clips found!`;
         }
 
-        showClips(
-          data.clips
-        );
+
+        showClips(clips);
+
 
         setStatus(
-          `● ${data.clips.length} Shorts ready`
+          `● ${clips.length} AI Shorts ready`
         );
+
 
       } catch (error) {
 
         console.error(
-          "YouTube analysis error:",
+          "AI CLIP ERROR:",
           error
         );
+
 
         if (youtubeProgress) {
           youtubeProgress.style.width =
@@ -441,8 +492,9 @@ if (analyzeYoutube) {
 
         if (youtubeProgressText) {
           youtubeProgressText.textContent =
-            "Analysis failed";
+            "Clip generation failed";
         }
+
 
         setStatus(
           "❌ " +
@@ -451,6 +503,16 @@ if (analyzeYoutube) {
             "Clip generation failed"
           )
         );
+
+
+        alert(
+          "AI Clip Generation Failed:\n\n" +
+          (
+            error?.message ||
+            "Unknown error"
+          )
+        );
+
 
       } finally {
 
