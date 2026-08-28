@@ -1,87 +1,518 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Caption Forge</title>
-  <link rel="stylesheet" href="style.css" />
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>GLOWING AI — AI Shorts Studio</title>
+  <link rel="stylesheet" href="style.css">
+
+  <style>
+    .youtube-box {
+      margin-top: 22px;
+      padding: 20px;
+      border: 1px solid rgba(255,255,255,.1);
+      border-radius: 18px;
+      background: rgba(255,255,255,.035);
+    }
+
+    .youtube-box h3 {
+      margin: 0 0 6px;
+    }
+
+    .youtube-box p {
+      margin: 0 0 14px;
+      opacity: .65;
+      font-size: 13px;
+    }
+
+    .youtube-row {
+      display: flex;
+      gap: 10px;
+    }
+
+    .youtube-row input {
+      flex: 1;
+      min-width: 0;
+      padding: 14px 15px;
+      border-radius: 12px;
+      border: 1px solid rgba(255,255,255,.12);
+      background: #111;
+      color: white;
+      outline: none;
+    }
+
+    .youtube-row button {
+      white-space: nowrap;
+    }
+
+    .clips-section {
+      margin-top: 22px;
+    }
+
+    .clips-grid {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 14px;
+      margin-top: 15px;
+    }
+
+    .clip-card {
+      padding: 12px;
+      border-radius: 16px;
+      background: rgba(255,255,255,.045);
+      border: 1px solid rgba(255,255,255,.08);
+      transition: .2s;
+      cursor: pointer;
+    }
+
+    .clip-card:hover {
+      transform: translateY(-3px);
+      border-color: rgba(215,255,52,.45);
+    }
+
+    .clip-thumb {
+      aspect-ratio: 9/16;
+      border-radius: 12px;
+      background:
+        linear-gradient(145deg,#181818,#050505);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 30px;
+      margin-bottom: 10px;
+    }
+
+    .clip-card b {
+      display: block;
+      font-size: 14px;
+      margin-bottom: 5px;
+    }
+
+    .clip-card small {
+      opacity: .6;
+    }
+
+    .score {
+      display: inline-block;
+      margin-top: 8px;
+      padding: 4px 8px;
+      border-radius: 20px;
+      background: rgba(215,255,52,.1);
+      color: #d7ff34;
+      font-size: 11px;
+    }
+
+    .processing {
+      display: none;
+      margin-top: 15px;
+    }
+
+    .processing.active {
+      display: block;
+    }
+
+    @media(max-width:900px) {
+      .clips-grid {
+        grid-template-columns: repeat(2,1fr);
+      }
+
+      .youtube-row {
+        flex-direction: column;
+      }
+    }
+  </style>
 </head>
+
 <body>
-  <header class="topbar">
-    <div class="brand"><span class="logo">KF</span><div><b>Caption Forge</b><small>script → timed, styled captions</small></div></div>
-    <div id="status" class="status">● Waiting for media</div>
-  </header>
 
-  <main class="app">
-    <aside class="sidebar">
-      <section>
-        <h3><span>01</span> LOAD MEDIA</h3>
-        <p>Upload a video or audio file.</p>
-        <label class="upload-box" for="videoInput">
-          <input id="videoInput" type="file" accept="video/*,audio/*" />
-          <strong>⇧</strong>
-          <b>Tap to choose a file, or drop it here</b>
-          <small>MP4, WebM, MP3, WAV...</small>
-        </label>
-      </section>
+<header>
+  <b>🟢 GLOWING AI</b>
 
-      <section>
-        <h3><span>02</span> AUTO CAPTIONS</h3>
-        <p>AI audio detection automatically creates timed captions.</p>
-        <select id="language">
-          <option value="auto">Auto detect language</option>
-          <option value="en">English</option>
-          <option value="hi">Hindi / Hinglish</option>
-        </select>
-        <button id="generateCaptions" class="primary">✦ Auto generate captions</button>
-        <div class="note">First use downloads the speech model, so it may take time.</div>
-      </section>
+  <div>
+    <button id="uploadTop">Upload video</button>
+    <button id="exportSrt">Export SRT</button>
+  </div>
+</header>
 
-      <section>
-        <h3><span>03</span> TIMING</h3>
-        <div class="range-row"><label>Words per caption</label><output id="wordCount">3</output></div>
-        <input id="wordsPerCaption" type="range" min="1" max="8" value="3" />
-      </section>
+<main>
 
-      <section>
-        <h3><span>04</span> EFFECTS & STYLE</h3>
-        <p>Choose a caption look. Effects animate while the video plays.</p>
-        <div id="stylesGrid" class="styles-grid"></div>
-      </section>
+<section class="hero">
+  <div>
+    <small>AI SHORTS STUDIO</small>
 
-      <section>
-        <h3><span>05</span> EXPORT</h3>
-        <div class="export-row">
-          <button id="downloadSrt">Download .SRT</button>
-          <button id="downloadJson">Download style .JSON</button>
-        </div>
-      </section>
-    </aside>
+    <h1>
+      Turn long videos into
+      <em>viral Shorts.</em>
+    </h1>
 
-    <section class="preview-area">
-      <div id="videoStage" class="video-stage empty">
-        <video id="video" playsinline controls></video>
-        <div id="captionOverlay" class="caption-overlay"></div>
-        <div id="emptyText" class="empty-text">▧<br><span>Load media to preview captions</span></div>
-      </div>
+    <p>
+      Find the best moments • Auto captions • 9:16 Shorts
+    </p>
+  </div>
 
-      <div class="timeline-controls">
-        <button id="playBtn" class="play">▶</button>
-        <span id="currentTime">00:00.0</span>
-        <input id="seek" type="range" min="0" max="1000" value="0" />
-        <span id="duration">00:00.0</span>
-      </div>
+  <strong id="status">● Waiting for video</strong>
+</section>
 
-      <div id="captionsTrack" class="caption-track"></div>
-    </section>
-  </main>
 
-  <nav class="mobile-nav">
-    <span>⌂<small>Home</small></span>
-    <span class="plus">＋</span>
-    <span>▣<small>Projects</small></span>
-  </nav>
+<!-- YOUTUBE -->
+<section class="youtube-box">
 
-  <script type="module" src="app.js"></script>
+  <h3>🎬 YouTube Video</h3>
+
+  <p>
+    Paste your YouTube video link and let AI find the strongest short-form moments.
+  </p>
+
+  <div class="youtube-row">
+
+    <input
+      id="youtubeUrl"
+      type="url"
+      placeholder="https://www.youtube.com/watch?v=..."
+      autocomplete="off"
+    >
+
+    <button
+      id="analyzeYoutube"
+      class="primary"
+    >
+      ✨ Find 5 Best Clips
+    </button>
+
+  </div>
+
+  <div class="processing" id="youtubeProcessing">
+
+    <div class="progress">
+      <i id="youtubeProgress"></i>
+    </div>
+
+    <small id="youtubeProgressText">
+      Preparing video analysis...
+    </small>
+
+  </div>
+
+</section>
+
+
+<!-- AI CLIPS -->
+<section class="panel clips-section">
+
+  <div class="head">
+
+    <b>🔥 AI Best Shorts</b>
+
+    <small id="clipsCount">
+      0 clips
+    </small>
+
+  </div>
+
+  <div
+    id="clipsGrid"
+    class="clips-grid"
+  >
+
+    <div class="clip-card">
+      <div class="clip-thumb">🎬</div>
+      <b>Clip 1</b>
+      <small>Waiting for analysis</small>
+    </div>
+
+    <div class="clip-card">
+      <div class="clip-thumb">🎬</div>
+      <b>Clip 2</b>
+      <small>Waiting for analysis</small>
+    </div>
+
+    <div class="clip-card">
+      <div class="clip-thumb">🎬</div>
+      <b>Clip 3</b>
+      <small>Waiting for analysis</small>
+    </div>
+
+    <div class="clip-card">
+      <div class="clip-thumb">🎬</div>
+      <b>Clip 4</b>
+      <small>Waiting for analysis</small>
+    </div>
+
+    <div class="clip-card">
+      <div class="clip-thumb">🎬</div>
+      <b>Clip 5</b>
+      <small>Waiting for analysis</small>
+    </div>
+
+  </div>
+
+</section>
+
+
+<!-- WORKSPACE -->
+<section class="workspace">
+
+  <aside class="panel">
+
+    <div
+      class="upload"
+      id="dropZone"
+    >
+
+      <input
+        id="videoInput"
+        type="file"
+        accept="video/*"
+        hidden
+      >
+
+      <b>↑ Drop video here</b>
+
+      <span>
+        or choose a video
+      </span>
+
+      <button
+        id="chooseVideo"
+        class="primary"
+      >
+        Choose Video
+      </button>
+
+    </div>
+
+
+    <hr>
+
+    <b>Caption AI</b>
+
+    <label>
+      Language
+
+      <select id="language">
+
+        <option value="auto">
+          Auto detect
+        </option>
+
+        <option value="en">
+          English
+        </option>
+
+        <option value="hi">
+          Hindi
+        </option>
+
+      </select>
+
+    </label>
+
+
+    <button
+      id="generateCaptions"
+      class="primary"
+    >
+      ✨ Generate Auto Captions
+    </button>
+
+
+    <div class="progress">
+      <i id="progressBar"></i>
+    </div>
+
+    <small id="progressText">
+      Nothing processed yet.
+    </small>
+
+
+    <hr>
+
+    <b>Short Settings</b>
+
+
+    <label>
+      Aspect Ratio
+
+      <select id="aspectRatio">
+
+        <option value="9:16">
+          9:16 — Shorts
+        </option>
+
+        <option value="1:1">
+          1:1 — Square
+        </option>
+
+        <option value="16:9">
+          16:9 — YouTube
+        </option>
+
+      </select>
+
+    </label>
+
+
+    <label>
+      Words
+
+      <input
+        id="wordsPerCaption"
+        type="range"
+        min="2"
+        max="8"
+        value="4"
+      >
+
+      <span id="wordCount">
+        4
+      </span>
+
+    </label>
+
+
+    <label>
+      Size
+
+      <input
+        id="fontSize"
+        type="range"
+        min="22"
+        max="90"
+        value="48"
+      >
+
+      <span id="fontSizeValue">
+        48
+      </span>
+
+    </label>
+
+
+    <label>
+      Position
+
+      <select id="captionPosition">
+
+        <option value="bottom">
+          Bottom
+        </option>
+
+        <option value="center">
+          Center
+        </option>
+
+        <option value="top">
+          Top
+        </option>
+
+      </select>
+
+    </label>
+
+  </aside>
+
+
+  <!-- PREVIEW -->
+  <section class="panel preview">
+
+    <div id="videoStage">
+
+      <video
+        id="video"
+        playsinline
+        controls
+      ></video>
+
+      <div id="captionOverlay"></div>
+
+      <span id="emptyState">
+        Select a clip to preview
+      </span>
+
+    </div>
+
+
+    <div class="timeline">
+
+      <button id="playBtn">
+        ▶
+      </button>
+
+      <span id="currentTime">
+        00:00.0
+      </span>
+
+      <input
+        id="seek"
+        type="range"
+        min="0"
+        max="1000"
+        value="0"
+      >
+
+      <span id="duration">
+        00:00.0
+      </span>
+
+    </div>
+
+  </section>
+
+
+  <!-- PRESETS -->
+  <aside class="panel">
+
+    <div class="head">
+
+      <b>Caption Presets</b>
+
+      <small id="presetCount"></small>
+
+    </div>
+
+    <div id="stylesGrid"></div>
+
+  </aside>
+
+</section>
+
+
+<!-- CAPTION TIMELINE -->
+<section class="panel list">
+
+  <div class="head">
+
+    <b>Caption Timeline</b>
+
+    <div>
+
+      <button id="downloadSrt">
+        SRT
+      </button>
+
+      <button id="downloadJson">
+        JSON
+      </button>
+
+    </div>
+
+  </div>
+
+
+  <div id="captionsTrack">
+
+    <p>
+      Generate captions to see the timeline.
+    </p>
+
+  </div>
+
+</section>
+
+</main>
+
+
+<script type="module" src="app.js"></script>
+
 </body>
 </html>
