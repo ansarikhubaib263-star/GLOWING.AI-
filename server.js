@@ -31,7 +31,7 @@ app.get("/api/health",(req,res)=>res.json({ok:true}));
 app.post("/api/clips", async (req,res)=>{
 try{
 const {url,count=5,maxSeconds=45}=req.body||{};
-if(!/^https?://(www.)?(youtube.com|youtu.be)//i.test(url||""))
+if (!/^https?:\/\/(www\.)?(youtube\.com|youtu\.be)\//i.test(url || ""))
 return res.status(400).json({error:"Enter a valid YouTube URL."});
 
 const n=Math.min(Math.max(Number(count)||5,1),10);  
