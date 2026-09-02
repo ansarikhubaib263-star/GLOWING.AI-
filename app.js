@@ -1,4 +1,4 @@
-const API = window.CLIPFORGE_API || "https://YOUR-RENDER-SERVICE.onrender.com";
+const API = window.CLIPFORGE_API || "https://glowing-ai.onrender.com";
 const urlEl = document.getElementById("url");
 const countEl = document.getElementById("count");
 const lengthEl = document.getElementById("length");
