@@ -71,8 +71,7 @@ res.status(500).json({error:"Processing failed. On a free server, long videos ma
 }
 });
 
-function fmt(s){const m=Math.floor(s/60),sec=Math.floor(s%60);return ${m}:${String(sec).padStart(2,"0")}}
-
+function fmt(s){const m=Math.floor(s/60),sec=Math.floor(s%60);return `${m}:${String(sec).padStart(2,"0")}`;}
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`ClipForge running on ${PORT}`);
 });
