@@ -1,0 +1,7 @@
+services:
+  - type: web
+    name: clipforge-ai
+    runtime: node
+    buildCommand: npm install && apt-get update && apt-get install -y ffmpeg
+    startCommand: npm start
+    plan: free
