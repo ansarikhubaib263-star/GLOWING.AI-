@@ -216,17 +216,18 @@ app.post("/api/clips", async (req, res) => {
 
       });
 
-    } catch (infoError) {
+    catch (infoError) {
 
-      console.error(
-        "❌ YouTube information failed:"
-      );
+  console.error("❌ YOUTUBE ACTUAL ERROR:");
+  console.error(infoError);
 
-      console.error(
-        infoError?.stderr ||
-        infoError?.message ||
-        infoError
-      );
+  throw new Error(
+    infoError?.stderr ||
+    infoError?.message ||
+    String(infoError)
+  );
+
+    }
 
       throw new Error(
         "YouTube extraction failed. " +
